@@ -1,0 +1,17 @@
+{
+  "name": "ccn-day-carnival-2026",
+  "version": "1.0.0",
+  "description": "Smart contract solution for managing CCN Day Carnival 2026 stall registrations, payments, refunds and withdrawals.",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "hardhat": "^2.22.0"
+  }
+}

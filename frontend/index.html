@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CCN Day Carnival 2026 — Stall Exchange</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --marigold:#E8A33D;
+    --plum:#3D2645;
+    --cream:#FFF8ED;
+    --teal:#1D7874;
+    --charcoal:#2B2118;
+    --paper:#FFFDF8;
+    --line: rgba(43,33,24,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--plum);
+    background-image:
+      radial-gradient(circle at 10% 10%, rgba(232,163,61,0.10), transparent 40%),
+      radial-gradient(circle at 90% 30%, rgba(29,120,116,0.14), transparent 45%);
+    color:var(--charcoal);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px;}
+
+  header.hero{
+    background:var(--cream);
+    border-radius:22px;
+    padding:36px 40px;
+    position:relative;
+    overflow:hidden;
+    border:1px solid rgba(0,0,0,0.04);
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.5);
+  }
+  header.hero::before{
+    content:"";
+    position:absolute; inset:10px;
+    border:2px dashed rgba(61,38,69,0.25);
+    border-radius:14px;
+    pointer-events:none;
+  }
+  .eyebrow{
+    font-family:'Space Mono', monospace;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    font-size:12px;
+    color:var(--teal);
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--marigold);}
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:900;
+    font-size:clamp(34px, 5vw, 54px);
+    line-height:1.02;
+    margin:10px 0 6px;
+    color:var(--plum);
+  }
+  .sub{
+    font-size:15.5px;
+    max-width:560px;
+    color:rgba(43,33,24,0.75);
+    line-height:1.55;
+  }
+  .hero-row{
+    display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap;
+  }
+  .ticket-stub{
+    font-family:'Space Mono', monospace;
+    font-size:11.5px;
+    background:var(--plum);
+    color:var(--cream);
+    padding:14px 18px;
+    border-radius:10px;
+    display:flex; flex-direction:column; gap:4px;
+    min-width:210px;
+  }
+  .ticket-stub b{color:var(--marigold);}
+
+  button.connect{
+    background:var(--teal); color:white; border:none;
+    padding:12px 20px; border-radius:10px; font-weight:600; font-size:14px;
+    cursor:pointer; font-family:'Inter',sans-serif;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  button.connect:hover{transform:translateY(-2px); box-shadow:0 10px 20px -8px rgba(29,120,116,0.6);}
+  .status-pill{
+    font-family:'Space Mono', monospace; font-size:12px;
+    background:rgba(61,38,69,0.08); color:var(--plum);
+    padding:8px 12px; border-radius:20px; display:inline-block; margin-top:10px;
+  }
+
+  nav.tabs{
+    display:flex; gap:8px; margin:28px 0 20px; flex-wrap:wrap;
+  }
+  nav.tabs button{
+    font-family:'Space Mono', monospace;
+    background:transparent; color:var(--cream); border:1px solid rgba(255,248,237,0.35);
+    padding:9px 16px; border-radius:999px; font-size:12.5px; cursor:pointer;
+    letter-spacing:.03em;
+  }
+  nav.tabs button.active{background:var(--marigold); color:var(--plum); border-color:var(--marigold); font-weight:700;}
+
+  section.panel{
+    background:var(--paper);
+    border-radius:18px;
+    padding:28px 30px;
+    margin-bottom:22px;
+    box-shadow:0 20px 45px -25px rgba(0,0,0,0.6);
+  }
+  section.panel h2{
+    font-family:'Fraunces', serif; color:var(--plum); font-size:22px; margin:0 0 6px;
+  }
+  section.panel p.hint{color:rgba(43,33,24,0.6); font-size:13.5px; margin:0 0 18px;}
+
+  .field-row{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
+  .field{display:flex; flex-direction:column; gap:6px; flex:1; min-width:180px;}
+  .field label{font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--teal); font-weight:700;}
+  .field input{
+    padding:11px 12px; border-radius:9px; border:1px solid var(--line);
+    font-family:'Inter',sans-serif; font-size:14px; background:#fff;
+  }
+  .actions{display:flex; gap:10px; flex-wrap:wrap;}
+  button.primary{
+    background:var(--plum); color:var(--cream); border:none; padding:11px 18px;
+    border-radius:9px; font-weight:600; cursor:pointer; font-size:13.5px;
+  }
+  button.ghost{
+    background:transparent; color:var(--plum); border:1.5px solid var(--plum); padding:10px 17px;
+    border-radius:9px; font-weight:600; cursor:pointer; font-size:13.5px;
+  }
+  button.danger{
+    background:#B5462F; color:white; border:none; padding:10px 17px; border-radius:9px;
+    font-weight:600; cursor:pointer; font-size:13.5px;
+  }
+  button:disabled{opacity:.45; cursor:not-allowed;}
+
+  .stall-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); gap:16px;}
+  .stall-card{
+    border:1px solid var(--line); border-radius:14px; padding:18px;
+    background:repeating-linear-gradient(135deg, rgba(232,163,61,0.05) 0 10px, transparent 10px 20px);
+    position:relative;
+  }
+  .stall-card .id-tag{
+    font-family:'Space Mono', monospace; font-size:11px; color:var(--teal); font-weight:700;
+  }
+  .status-badge{
+    float:right; font-family:'Space Mono', monospace; font-size:10.5px; font-weight:700;
+    text-transform:uppercase; letter-spacing:.06em; padding:3px 9px; border-radius:20px;
+  }
+  .status-badge.status-pending{background:rgba(232,163,61,0.18); color:#8a5a12;}
+  .status-badge.status-approved{background:rgba(29,120,116,0.16); color:var(--teal);}
+  .status-badge.status-rejected{background:rgba(180,40,40,0.14); color:#a12a2a;}
+  .stall-card h3{font-family:'Fraunces',serif; margin:4px 0 2px; color:var(--plum); font-size:19px;}
+  .stall-card .owner{font-size:11.5px; color:rgba(43,33,24,0.55); font-family:'Space Mono',monospace; word-break:break-all;}
+  .stall-card .meta{display:flex; justify-content:space-between; margin:12px 0; font-size:13px;}
+  .stall-card .meta b{color:var(--plum);}
+  .rating-stars{color:var(--marigold); font-size:14px; letter-spacing:1px;}
+
+  .log{
+    font-family:'Space Mono', monospace; font-size:12.5px; background:var(--charcoal); color:#DCEFEA;
+    border-radius:12px; padding:16px; max-height:220px; overflow-y:auto; line-height:1.6;
+  }
+  .log .ok{color:#8FE3A8;}
+  .log .err{color:#F3A6A6;}
+  .divider{border:none; border-top:1px dashed var(--line); margin:18px 0;}
+  footer{text-align:center; color:rgba(255,248,237,0.55); font-size:12px; margin-top:30px; font-family:'Space Mono',monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span> CCN DAY CARNIVAL · 2026 EDITION</div>
+    <div class="hero-row">
+      <div>
+        <h1>Stall Exchange</h1>
+        <p class="sub">Register a stall, take payments straight from festival-goers' wallets, refund whoever needs it, and cash out once the organisers close the books the day after the carnival.</p>
+        <div id="statusPill" class="status-pill">Wallet not connected</div>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:12px;">
+        <button class="connect" id="connectBtn">Connect Wallet</button>
+        <div class="ticket-stub">
+          <span>ADMIT ONE — STALLHOLDER</span>
+          <span>CONTRACT <b id="contractAddrShort">not set</b></span>
+          <span>NETWORK <b id="networkName">—</b></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="stalls">Stalls & Payments</button>
+    <button class="tab-btn" data-tab="manage">My Stall Tools</button>
+    <button class="tab-btn" data-tab="admin">Organiser Desk</button>
+  </nav>
+
+  <!-- STALLS + PAYMENTS -->
+  <section class="panel" id="tab-stalls">
+    <h2>Apply for a stall</h2>
+    <p class="hint">Only wallets whitelisted by the organiser (students &amp; staff) can apply. Your stall stays <b>Pending</b> — and can't accept payments — until the organiser approves it.</p>
+    <div class="field-row">
+      <div class="field">
+        <label>Stall name</label>
+        <input id="stallNameInput" placeholder="e.g. Waffle Wonderland" />
+      </div>
+    </div>
+    <div class="actions"><button class="primary" id="registerBtn">Submit application</button></div>
+
+    <hr class="divider" />
+
+    <h2>Browse &amp; pay stalls</h2>
+    <p class="hint">Connect any wallet — no whitelist needed — and pay an <b>approved</b> stall directly in ETH.</p>
+    <div class="actions" style="margin-bottom:16px;">
+      <button class="ghost" id="refreshBtn">Refresh stalls</button>
+    </div>
+    <div class="stall-grid" id="stallGrid"></div>
+  </section>
+
+  <!-- STALL OWNER TOOLS -->
+  <section class="panel" id="tab-manage" style="display:none;">
+    <h2>Issue a refund</h2>
+    <p class="hint">Only refunds a specific customer, and only up to what that customer actually paid.</p>
+    <div class="field-row">
+      <div class="field"><label>Stall ID</label><input id="refundStallId" placeholder="0" /></div>
+      <div class="field"><label>Payer address</label><input id="refundPayer" placeholder="0x..." /></div>
+      <div class="field"><label>Amount (ETH)</label><input id="refundAmount" placeholder="0.1" /></div>
+    </div>
+    <div class="actions"><button class="primary" id="refundBtn">Send refund</button></div>
+
+    <hr class="divider" />
+
+    <h2>Withdraw stall earnings</h2>
+    <p class="hint">Only available once the organiser has processed the carnival end-of-day, plus one further day.</p>
+    <div class="field-row">
+      <div class="field"><label>Stall ID</label><input id="withdrawStallId" placeholder="0" /></div>
+    </div>
+    <div class="actions"><button class="primary" id="withdrawBtn">Withdraw funds</button></div>
+  </section>
+
+  <!-- ORGANISER DESK -->
+  <section class="panel" id="tab-admin" style="display:none;">
+    <h2>Review stall applications</h2>
+    <p class="hint">Approve turns a Pending application into a live stall that can accept payments. Rejecting permanently blocks it. Both actions are one-way.</p>
+    <div class="field-row">
+      <div class="field"><label>Stall ID</label><input id="approvalStallId" placeholder="0" /></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="approveBtn">Approve</button>
+      <button class="danger" id="rejectBtn">Reject</button>
+    </div>
+
+    <hr class="divider" />
+
+    <h2>Whitelist a student/staff wallet</h2>
+    <div class="field-row">
+      <div class="field"><label>Wallet address</label><input id="whitelistAddr" placeholder="0x..." /></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="addWhitelistBtn">Authorise</button>
+      <button class="ghost" id="removeWhitelistBtn">Revoke</button>
+    </div>
+
+    <hr class="divider" />
+
+    <h2>Close out the carnival</h2>
+    <p class="hint">Only callable once <code>carnivalEndTime</code> has passed. Opens the withdrawal window the following day.</p>
+    <div class="actions"><button class="primary" id="processBtn">Process carnival end</button></div>
+
+    <hr class="divider" />
+
+    <h2>Emergency circuit breaker</h2>
+    <p class="hint">Pausing halts payments, refunds and withdrawals immediately. Registration stays open.</p>
+    <div class="actions">
+      <button class="danger" id="pauseBtn">Pause contract</button>
+      <button class="ghost" id="unpauseBtn">Unpause contract</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Activity log</h2>
+    <div class="log" id="logBox">Waiting for wallet connection…</div>
+  </section>
+
+  <footer>CCN Day Carnival 2026 — Stall Exchange · built on CarnivalStallManager.sol</footer>
+</div>
+
+<script>
+
+const CONTRACT_ADDRESS = "0xDA0bab807633f07f013f94DD0E6A4F96F8742B53";
+
+const ABI = [
+  "function organiser() view returns (address)",
+  "function stallCount() view returns (uint256)",
+  "function isAuthorisedRegistrant(address) view returns (bool)",
+  "function isWithdrawalWindowOpen() view returns (bool)",
+  "function addAuthorisedRegistrant(address account)",
+  "function removeAuthorisedRegistrant(address account)",
+  "function registerStall(string name) returns (uint256)",
+  "function approveStall(uint256 stallId)",
+  "function rejectStall(uint256 stallId)",
+  "function payStall(uint256 stallId) payable",
+  "function issueRefund(uint256 stallId, address payable payer, uint256 amount)",
+  "function processCarnivalEnd()",
+  "function withdrawFunds(uint256 stallId)",
+  "function rateStall(uint256 stallId, uint8 rating)",
+  "function getAverageRating(uint256 stallId) view returns (uint256, uint256)",
+  "function getStall(uint256 stallId) view returns (address owner, string name, uint256 balance, bool withdrawn, uint256 totalPaid, uint8 status, uint256 appliedAt, uint256 decidedAt)",
+  "function pause()",
+  "function unpause()",
+  "event StallApplicationSubmitted(uint256 indexed stallId, address indexed applicant, string name, uint256 timestamp)",
+  "event StallApproved(uint256 indexed stallId, address indexed organiser, uint256 timestamp)",
+  "event StallRejected(uint256 indexed stallId, address indexed organiser, uint256 timestamp)",
+  "event PaymentMade(uint256 indexed stallId, address indexed payer, uint256 amount)"
+];
+
+let provider, signer, contract, userAddress;
+
+const logBox = document.getElementById('logBox');
+function log(msg, kind){
+  const line = document.createElement('div');
+  line.className = kind || '';
+  line.textContent = `› ${msg}`;
+  logBox.appendChild(line);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+document.getElementById('contractAddrShort').textContent =
+  CONTRACT_ADDRESS.slice(0,6) + '…' + CONTRACT_ADDRESS.slice(-4);
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    ['stalls','manage','admin'].forEach(t=>{
+      document.getElementById('tab-'+t).style.display = (t===btn.dataset.tab) ? 'block' : 'none';
+    });
+  });
+});
+
+async function connectWallet(){
+  if(!window.ethereum){
+    log('No injected wallet found. Install MetaMask to continue.', 'err');
+    return;
+  }
+  try{
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send('eth_requestAccounts', []);
+    signer = await provider.getSigner();
+    userAddress = await signer.getAddress();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+    const net = await provider.getNetwork();
+    document.getElementById('networkName').textContent = net.name || net.chainId.toString();
+    document.getElementById('statusPill').textContent =
+      `Connected: ${userAddress.slice(0,6)}…${userAddress.slice(-4)}`;
+    log('Wallet connected.', 'ok');
+    loadStalls();
+  }catch(err){
+    log('Connection failed: ' + (err.message || err), 'err');
+  }
+}
+document.getElementById('connectBtn').addEventListener('click', connectWallet);
+
+async function loadStalls(){
+  if(!contract) return;
+  const grid = document.getElementById('stallGrid');
+  grid.innerHTML = '';
+  try{
+    const count = await contract.stallCount();
+    for(let i=0; i<Number(count); i++){
+      const s = await contract.getStall(i);
+      const [avgTimes100, ratingCount] = await contract.getAverageRating(i);
+      const avg = Number(avgTimes100)/100;
+
+      const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
+      const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
+      const status = Number(s.status);
+      const isApproved = status === 2;
+
+      const card = document.createElement('div');
+      card.className = 'stall-card';
+      card.innerHTML = `
+        <div class="id-tag">STALL #${i}</div>
+        <span class="status-badge ${statusClasses[status]}">${statusNames[status]}</span>
+        <h3>${s.name}</h3>
+        <div class="owner">${s.owner}</div>
+        <div class="meta"><span>Balance</span><b>${ethers.formatEther(s.balance)} ETH</b></div>
+        <div class="meta"><span>Rating</span><span class="rating-stars">${ratingCount>0 ? avg.toFixed(2)+' ★ ('+ratingCount+')' : 'No ratings yet'}</span></div>
+        ${isApproved ? `
+        <div class="field-row" style="margin-bottom:8px;">
+          <div class="field"><label>Amount (ETH)</label><input class="pay-amount" placeholder="0.05" /></div>
+        </div>
+        <div class="actions">
+          <button class="primary pay-btn">Pay stall</button>
+          <button class="ghost rate-btn">Rate ★</button>
+        </div>` : `<p class="hint">${status===1 ? 'Awaiting organiser approval — payments are disabled until then.' : 'This application was rejected and cannot accept payments.'}</p>`}
+        `;
+
+      if(isApproved){
+        card.querySelector('.pay-btn').addEventListener('click', async ()=>{
+          const amt = card.querySelector('.pay-amount').value || '0';
+          try{
+            const tx = await contract.payStall(i, { value: ethers.parseEther(amt) });
+            log(`Paying stall #${i}: ${amt} ETH — tx ${tx.hash.slice(0,10)}…`);
+            await tx.wait();
+            log(`Payment confirmed for stall #${i}.`, 'ok');
+            loadStalls();
+          }catch(err){ log('Payment failed: ' + (err.reason || err.message || err), 'err'); }
+        });
+
+        card.querySelector('.rate-btn').addEventListener('click', async ()=>{
+          const rating = prompt('Rate this stall from 1 to 5:', '5');
+          if(!rating) return;
+          try{
+            const tx = await contract.rateStall(i, Number(rating));
+            log(`Rating stall #${i}: ${rating}★ — tx ${tx.hash.slice(0,10)}…`);
+            await tx.wait();
+            log('Rating recorded.', 'ok');
+            loadStalls();
+          }catch(err){ log('Rating failed: ' + (err.reason || err.message || err), 'err'); }
+        });
+      }
+
+      grid.appendChild(card);
+    }
+    if(Number(count)===0){
+      grid.innerHTML = '<p class="hint">No stalls registered yet.</p>';
+    }
+  }catch(err){
+    log('Could not load stalls: ' + (err.reason || err.message || err), 'err');
+  }
+}
+document.getElementById('refreshBtn').addEventListener('click', loadStalls);
+
+document.getElementById('registerBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('stallNameInput').value.trim();
+  if(!name){ log('Enter a stall name first.', 'err'); return; }
+  try{
+    const tx = await contract.registerStall(name);
+    log(`Registering "${name}" — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Stall registered.', 'ok');
+    document.getElementById('stallNameInput').value = '';
+    loadStalls();
+  }catch(err){ log('Registration failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('refundBtn').addEventListener('click', async ()=>{
+  const stallId = document.getElementById('refundStallId').value;
+  const payer = document.getElementById('refundPayer').value.trim();
+  const amount = document.getElementById('refundAmount').value;
+  try{
+    const tx = await contract.issueRefund(stallId, payer, ethers.parseEther(amount));
+    log(`Refunding ${amount} ETH to ${payer.slice(0,8)}… — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Refund sent.', 'ok');
+    loadStalls();
+  }catch(err){ log('Refund failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('withdrawBtn').addEventListener('click', async ()=>{
+  const stallId = document.getElementById('withdrawStallId').value;
+  try{
+    const tx = await contract.withdrawFunds(stallId);
+    log(`Withdrawing funds for stall #${stallId} — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Withdrawal complete.', 'ok');
+    loadStalls();
+  }catch(err){ log('Withdrawal failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('addWhitelistBtn').addEventListener('click', async ()=>{
+  const addr = document.getElementById('whitelistAddr').value.trim();
+  try{
+    const tx = await contract.addAuthorisedRegistrant(addr);
+    log(`Authorising ${addr.slice(0,8)}… — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Address authorised.', 'ok');
+  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('removeWhitelistBtn').addEventListener('click', async ()=>{
+  const addr = document.getElementById('whitelistAddr').value.trim();
+  try{
+    const tx = await contract.removeAuthorisedRegistrant(addr);
+    log(`Revoking ${addr.slice(0,8)}… — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Address revoked.', 'ok');
+  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('approveBtn').addEventListener('click', async ()=>{
+  const stallId = document.getElementById('approvalStallId').value;
+  try{
+    const tx = await contract.approveStall(stallId);
+    log(`Approving stall #${stallId} — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Stall approved — it can now accept payments.', 'ok');
+    loadStalls();
+  }catch(err){ log('Approval failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('rejectBtn').addEventListener('click', async ()=>{
+  const stallId = document.getElementById('approvalStallId').value;
+  try{
+    const tx = await contract.rejectStall(stallId);
+    log(`Rejecting stall #${stallId} — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Stall rejected.', 'ok');
+    loadStalls();
+  }catch(err){ log('Rejection failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('processBtn').addEventListener('click', async ()=>{
+  try{
+    const tx = await contract.processCarnivalEnd();
+    log(`Processing carnival end-of-day — tx ${tx.hash.slice(0,10)}…`);
+    await tx.wait();
+    log('Carnival processed. Withdrawals open 24h from now.', 'ok');
+  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+document.getElementById('pauseBtn').addEventListener('click', async ()=>{
+  try{
+    const tx = await contract.pause();
+    log('Pausing contract…'); await tx.wait(); log('Contract paused.', 'ok');
+  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
+});
+document.getElementById('unpauseBtn').addEventListener('click', async ()=>{
+  try{
+    const tx = await contract.unpause();
+    log('Unpausing contract…'); await tx.wait(); log('Contract unpaused.', 'ok');
+  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
+});
+</script>
+</body>
+</html>
