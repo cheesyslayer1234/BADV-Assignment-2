@@ -4,4 +4,3 @@ cache/
 coverage/
 coverage.json
 .env
-package-lock.json
