@@ -19,7 +19,10 @@ scripts/
   deploy.js                  # local/testnet deployment script
 frontend/
   index.html                 # standalone web interface (ethers.js + MetaMask)
-.github/workflows/ci.yml     # CI pipeline: compile + test + coverage on every push
+.github/workflows/ci.yml     # CI/CD pipeline: compile + test + coverage on every push,
+                              # then auto-deploy to Sepolia on push to main
+deployments/                  # deployment records written by scripts/deploy.js (gitignored)
+CD-SETUP.md                  # one-time setup guide for the CD (Sepolia deploy) stage
 Report.docx                  # design report (see assignment brief)
 ```
 

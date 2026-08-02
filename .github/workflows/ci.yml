@@ -1,4 +1,4 @@
-name: CCN Carnival Smart Contract CI
+name: CCN Carnival Smart Contract CI/CD
 
 on:
   push:
@@ -31,3 +31,44 @@ jobs:
 
       - name: Run coverage report
         run: npx hardhat coverage
+
+  deploy-testnet:
+    name: Deploy to Sepolia testnet
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    # Only deploy on a real push to main (not on pull requests), so forks/PRs
+    # never get access to the deployment secrets.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      - name: Deploy to Sepolia
+        run: npx hardhat run scripts/deploy.js --network sepolia
+        env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Upload deployment record
+        uses: actions/upload-artifact@v4
+        with:
+          name: sepolia-deployment
+          path: deployments/sepolia.json
+
+      - name: Add deployment summary
+        run: |
+          echo "### 🚀 Deployed to Sepolia" >> $GITHUB_STEP_SUMMARY
+          cat deployments/sepolia.json >> $GITHUB_STEP_SUMMARY
