@@ -1,4 +1,4 @@
-const CONTRACT_ADDRESS = "0x146f4b9aE4DbD9Cb0fb2EEfc7dE1a6550d4df831";
+const CONTRACT_ADDRESS = "0x358AA13c52544ECCEF6B0ADD0f801012ADAD5eE3";
 const CONTRACT_ABI = [
     "function getAllProducts() public view returns (tuple(uint256 id, string name, uint256 price)[])",
     "function buyProduct(uint256 _id) public payable"
