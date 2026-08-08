@@ -57,6 +57,20 @@ contract CarnivalStallManager {
 
     uint256 public stallCount;
 
+    // ---- Carnival-wide transparency accounting ----
+    // Running totals kept in storage (rather than summed on-demand across
+    // every stall) so anyone — no wallet, no manual per-stall lookups — can
+    // read one number for "how much has this carnival raised/refunded/paid
+    // out, ever" in a single free eth_call. This is what backs the public
+    // transparency dashboard.
+    uint256 public totalRaised;    // cumulative sum of every payStall() call, all-time
+    uint256 public totalRefunded;  // cumulative sum of every issueRefund() call, all-time
+    uint256 public totalWithdrawn; // cumulative sum of every withdrawFunds() call, all-time
+
+    uint256 public pendingCount;
+    uint256 public approvedCount;
+    uint256 public rejectedCount;
+
     mapping(uint256 => mapping(address => uint256)) private payerCredit;
 
     mapping(uint256 => mapping(address => bool)) private hasPaidStall;
@@ -153,6 +167,7 @@ contract CarnivalStallManager {
             decidedAt: 0
         });
         stallCount += 1;
+        pendingCount += 1;
 
         emit StallApplicationSubmitted(stallId, msg.sender, name, block.timestamp);
     }
@@ -163,6 +178,8 @@ contract CarnivalStallManager {
 
         stall.status = StallStatus.Approved;
         stall.decidedAt = block.timestamp;
+        pendingCount -= 1;
+        approvedCount += 1;
 
         emit StallApproved(stallId, msg.sender, block.timestamp);
     }
@@ -173,6 +190,8 @@ contract CarnivalStallManager {
 
         stall.status = StallStatus.Rejected;
         stall.decidedAt = block.timestamp;
+        pendingCount -= 1;
+        rejectedCount += 1;
 
         emit StallRejected(stallId, msg.sender, block.timestamp);
     }
@@ -187,6 +206,7 @@ contract CarnivalStallManager {
         Stall storage stall = stalls[stallId];
         stall.balance += msg.value;
         stall.totalPaid += msg.value;
+        totalRaised += msg.value;
 
         payerCredit[stallId][msg.sender] += msg.value;
         hasPaidStall[stallId][msg.sender] = true;
@@ -209,6 +229,7 @@ contract CarnivalStallManager {
 
         payerCredit[stallId][payer] = credit - amount;
         stall.balance -= amount;
+        totalRefunded += amount;
 
         (bool ok, ) = payer.call{value: amount}("");
         if (!ok) revert TransferFailed();
@@ -240,6 +261,7 @@ contract CarnivalStallManager {
 
         stall.balance = 0;
         stall.withdrawn = true;
+        totalWithdrawn += amount;
 
         (bool ok, ) = payable(msg.sender).call{value: amount}("");
         if (!ok) revert TransferFailed();
@@ -285,5 +307,52 @@ contract CarnivalStallManager {
 
     function contractBalance() external view returns (uint256) {
         return address(this).balance;
+    }
+
+    /// @notice One-call summary for the public transparency dashboard —
+    /// carnival-wide totals and per-status stall counts, with no need to
+    /// loop over individual stalls or hold a wallet/signer.
+    function getCarnivalStats()
+        external
+        view
+        returns (
+            uint256 _stallCount,
+            uint256 _pendingCount,
+            uint256 _approvedCount,
+            uint256 _rejectedCount,
+            uint256 _totalRaised,
+            uint256 _totalRefunded,
+            uint256 _totalWithdrawn,
+            bool _carnivalProcessed,
+            uint256 _carnivalEndTime
+        )
+    {
+        return (
+            stallCount,
+            pendingCount,
+            approvedCount,
+            rejectedCount,
+            totalRaised,
+            totalRefunded,
+            totalWithdrawn,
+            carnivalProcessed,
+            carnivalEndTime
+        );
+    }
+
+    /// @notice Proves the contract's own bookkeeping (what it *says* it has
+    /// raised, refunded and paid out) matches the ETH it actually holds
+    /// right now. `expectedBalance` is derived purely from the running
+    /// totals above — nobody has to trust the numbers on a dashboard; they
+    /// can call this themselves (e.g. on Etherscan's "Read Contract" tab)
+    /// and compare against the contract's real balance.
+    function auditBalance()
+        external
+        view
+        returns (bool balanced, uint256 expectedBalance, uint256 actualBalance)
+    {
+        expectedBalance = totalRaised - totalRefunded - totalWithdrawn;
+        actualBalance = address(this).balance;
+        balanced = expectedBalance == actualBalance;
     }
 }

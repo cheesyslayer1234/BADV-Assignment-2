@@ -402,4 +402,92 @@ describe("CarnivalStallManager", function () {
       ).to.be.revertedWithCustomError(contract, "NotEligibleToRegister");
     });
   });
+
+  describe("Additional Feature: Transparency accounting", function () {
+    beforeEach(async function () {
+      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
+      await contract.connect(staff).registerStall("Iced Tea Stand", staffProof);
+    });
+
+    it("tracks pending/approved/rejected counts as applications move through review", async function () {
+      let stats = await contract.getCarnivalStats();
+      expect(stats.pendingCount).to.equal(2);
+      expect(stats.approvedCount).to.equal(0);
+      expect(stats.rejectedCount).to.equal(0);
+
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(organiser).rejectStall(1);
+
+      stats = await contract.getCarnivalStats();
+      expect(stats.pendingCount).to.equal(0);
+      expect(stats.approvedCount).to.equal(1);
+      expect(stats.rejectedCount).to.equal(1);
+      expect(stats.stallCount).to.equal(2);
+    });
+
+    it("accumulates totalRaised across payments to multiple stalls", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(organiser).approveStall(1);
+
+      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("1") });
+      await contract.connect(buyer2).payStall(1, { value: ethers.parseEther("2") });
+
+      const stats = await contract.getCarnivalStats();
+      expect(stats.totalRaised).to.equal(ethers.parseEther("3"));
+      expect(stats.totalRefunded).to.equal(0);
+      expect(stats.totalWithdrawn).to.equal(0);
+    });
+
+    it("accumulates totalRefunded independently of totalRaised", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("2") });
+      await contract.connect(student).issueRefund(0, buyer1.address, ethers.parseEther("0.5"));
+
+      const stats = await contract.getCarnivalStats();
+      expect(stats.totalRaised).to.equal(ethers.parseEther("2"));
+      expect(stats.totalRefunded).to.equal(ethers.parseEther("0.5"));
+    });
+
+    it("accumulates totalWithdrawn after payout", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("1") });
+
+      await time.increaseTo(carnivalEndTime + 1);
+      await contract.connect(organiser).processCarnivalEnd();
+      await time.increase(24 * 60 * 60 + 1);
+      await contract.connect(student).withdrawFunds(0);
+
+      const stats = await contract.getCarnivalStats();
+      expect(stats.totalWithdrawn).to.equal(ethers.parseEther("1"));
+    });
+
+    it("auditBalance() reports balanced=true when bookkeeping matches the real balance", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("2") });
+      await contract.connect(student).issueRefund(0, buyer1.address, ethers.parseEther("0.5"));
+
+      const audit = await contract.auditBalance();
+      const actualBalance = await ethers.provider.getBalance(await contract.getAddress());
+
+      expect(audit.balanced).to.equal(true);
+      expect(audit.expectedBalance).to.equal(ethers.parseEther("1.5"));
+      expect(audit.actualBalance).to.equal(actualBalance);
+    });
+
+    it("auditBalance() stays balanced through the full raise -> refund -> withdraw lifecycle", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("3") });
+      await contract.connect(student).issueRefund(0, buyer1.address, ethers.parseEther("1"));
+
+      await time.increaseTo(carnivalEndTime + 1);
+      await contract.connect(organiser).processCarnivalEnd();
+      await time.increase(24 * 60 * 60 + 1);
+      await contract.connect(student).withdrawFunds(0);
+
+      const audit = await contract.auditBalance();
+      expect(audit.balanced).to.equal(true);
+      expect(audit.expectedBalance).to.equal(0);
+      expect(audit.actualBalance).to.equal(0);
+    });
+  });
 });

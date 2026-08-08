@@ -486,3 +486,34 @@ footer.site-footer{
 }
 .elig-banner.elig-warn b{display:block; margin-bottom:4px;}
 .elig-banner.elig-warn p{margin:0 0 10px; color:var(--ink-soft); font-weight:400;}
+
+/* ---------- Transparency dashboard: KPI stat cards & audit badge ---------- */
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:14px;}
+.stat-card{
+  border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 18px;
+  background:var(--paper); border-top:3px solid var(--red);
+}
+.stat-card .stat-label{
+  font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint);
+  font-weight:700; margin-bottom:6px;
+}
+.stat-card .stat-value{
+  font-family:'Archivo', sans-serif; font-weight:800; font-size:22px; color:var(--ink);
+  word-break:break-word;
+}
+.stat-card.stat-gold{border-top-color:var(--gold);}
+.stat-card.stat-green{border-top-color:var(--green);}
+
+.audit-badge{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  border-radius:var(--radius-md); padding:16px 20px; border:1.5px solid var(--line);
+}
+.audit-badge.audit-ok{background:var(--green-soft); border-color:var(--green);}
+.audit-badge.audit-bad{background:var(--red-soft); border-color:var(--red);}
+.audit-badge .audit-icon{font-size:24px; line-height:1;}
+.audit-badge .audit-text b{display:block; font-family:'Archivo',sans-serif; font-weight:800; font-size:15px;}
+.audit-badge.audit-ok .audit-text b{color:var(--green);}
+.audit-badge.audit-bad .audit-text b{color:var(--red);}
+.audit-badge .audit-text span{font-size:12.5px; color:var(--ink-soft); font-family:'Space Mono', monospace;}
+
+.status-breakdown-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:14px;}

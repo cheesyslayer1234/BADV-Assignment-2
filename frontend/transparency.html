@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Apply for a Stall — CCN Day Carnival</title>
+<title>Transparency Dashboard — CCN Day Carnival</title>
+<meta name="description" content="Live, verifiable on-chain totals for the CCN Day Carnival — no wallet required." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/styles.css" />
@@ -27,9 +28,7 @@
         </div>
       </div>
       <div class="topbar-right">
-        <div id="statusPill" class="status-pill">Wallet not connected</div>
-        <button class="connect" id="connectBtn">Connect Wallet</button>
-        <button class="connect outline" id="disconnectBtn" style="display:none;">Disconnect</button>
+        <div class="status-pill" id="readStatusPill">Reading chain…</div>
         <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
@@ -45,11 +44,11 @@
     </div>
     <nav>
       <a href="index.html"><span>About CCN Day</span><small>What the carnival is, when &amp; where</small></a>
-      <a href="apply.html" class="active"><span>Apply for a Stall</span><small>Register your stall — you are here</small></a>
+      <a href="apply.html"><span>Apply for a Stall</span><small>Register your stall</small></a>
       <a href="browse.html"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall</small></a>
       <a href="manage.html"><span>My Stall Tools</span><small>Refunds &amp; withdrawals</small></a>
       <a href="organiser.html"><span>Organiser Desk</span><small>Approvals, eligibility list, close-out</small></a>
-      <a href="transparency.html"><span>Transparency Dashboard</span><small>Live totals — no wallet needed</small></a>
+      <a href="transparency.html" class="active"><span>Transparency Dashboard</span><small>Live totals — you are here</small></a>
     </nav>
     <div class="drawer-foot">CONTRACT <span id="drawerContractAddr">—</span></div>
   </aside>
@@ -57,52 +56,52 @@
   <div class="wrap" style="padding-top:32px;">
 
     <section class="panel subtle" style="margin-top:0;">
-      <h2>Apply for a Stall</h2>
-      <p class="hint">Contract <b id="contractAddrShort">not set</b> · Network <b id="networkName">—</b></p>
+      <h2>Transparency Dashboard</h2>
+      <p class="hint">
+        Every number on this page is read straight off the contract, live, with <b>no wallet connection and no login</b> —
+        it's the same data anyone (a stall owner, a donor, your lecturer) can pull up themselves. Contract
+        <b id="contractAddrShort">not set</b> · Network <b id="networkName">—</b>
+        <span id="explorerLinkWrap"></span>
+      </p>
     </section>
 
-    <section class="panel">
-      <h2>Submit your application</h2>
-      <p class="hint">Your stall stays <b>Pending</b> — and can't accept payments — until the organiser approves it.</p>
-
-      <div class="elig-check" id="eligChecking">
-        <div class="empty-state"><span class="spinner"></span>&nbsp; Checking whether this wallet can apply…</div>
+    <section class="panel" id="statsPanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <h2 style="margin:0;">Carnival-wide totals</h2>
+        <button class="ghost" id="refreshStatsBtn">Refresh</button>
       </div>
-
-      <div class="elig-banner elig-yes" id="eligYes" style="display:none;">
-        ✓ This wallet is eligible to apply.
-      </div>
-
-      <div class="elig-banner elig-no" id="eligNo" style="display:none;">
-        <b>This wallet isn't on the eligible list yet.</b>
-        <p>Ask the organiser to add your wallet address, or check back after they publish the eligibility list. Your address:</p>
-        <div class="addr" id="notEligibleAddr">—</div>
-      </div>
-
-      <div class="elig-banner elig-warn" id="eligUnknown" style="display:none;">
-        <b>Couldn't check your eligibility right now.</b>
-        <p>This is usually temporary — try refreshing the page in a minute. If it keeps happening, let the organiser know.</p>
-        <div class="actions"><button class="ghost" id="retryEligBtn">Try again</button></div>
-      </div>
-
-      <div id="applyForm" style="display:none;">
-        <div class="field-row">
-          <div class="field">
-            <label>Stall name</label>
-            <input id="stallNameInput" placeholder="e.g. Waffle Wonderland" />
-          </div>
-        </div>
-        <div class="actions"><button class="primary" id="registerBtn">Submit application</button></div>
+      <p class="hint">All-time cumulative figures across every stall, kept as running totals on-chain — not summed up on this page.</p>
+      <div class="stat-grid" id="statGrid">
+        <p class="empty-state"><span class="spinner"></span>&nbsp; Reading contract…</p>
       </div>
     </section>
 
     <section class="panel subtle">
-      <h2>Your applications</h2>
-      <p class="hint">Stalls registered under the connected wallet, and their current status.</p>
-      <div class="stall-grid" id="myApplicationsList">
-        <p class="empty-state">Connect your wallet to see your applications.</p>
-      </div>
+      <h2>Self-audit: does the bookkeeping match the money?</h2>
+      <p class="hint">
+        The contract exposes a public <code>auditBalance()</code> check: it compares what it <i>says</i> it has raised, refunded
+        and paid out against the ETH it actually holds right now. This isn't something the dashboard calculates for you — anyone
+        can call <code>auditBalance()</code> directly on Etherscan's "Read Contract" tab and get the same three numbers, independent
+        of this site.
+      </p>
+      <div id="auditWrap"><p class="empty-state"><span class="spinner"></span>&nbsp; Running self-audit…</p></div>
     </section>
+
+    <section class="panel">
+      <h2>Stall applications by status</h2>
+      <p class="hint">Live counts of pending, approved and rejected applications — the same numbers the Organiser Desk works from.</p>
+      <div id="statusBreakdown"><p class="empty-state"><span class="spinner"></span>&nbsp; Loading…</p></div>
+    </section>
+
+    <details class="panel subtle" style="cursor:default;">
+      <summary style="cursor:pointer; font-weight:700; color:var(--red);">How to verify this yourself, without trusting this site</summary>
+      <p class="hint" style="margin-top:10px;">
+        1. Copy the contract address above. 2. Open it on Etherscan (link provided when on a public network) or paste it into
+        any block explorer / your own script. 3. Call <code>getCarnivalStats()</code> and <code>auditBalance()</code> under
+        "Read Contract" — both are public <code>view</code> functions, free to call, and require no wallet signature. If the
+        numbers you get back don't match what's shown here, trust the explorer, not this page.
+      </p>
+    </details>
 
   </div>
 
@@ -121,8 +120,6 @@
   </footer>
 
 <script src="js/config.js"></script>
-<script src="js/wallet.js"></script>
-<script src="js/merkle.js"></script>
-<script src="js/apply.js"></script>
+<script src="js/transparency.js"></script>
 </body>
 </html>
