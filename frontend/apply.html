@@ -62,20 +62,37 @@
 
     <section class="panel">
       <h2>Submit your application</h2>
-      <p class="hint">Eligible if the organiser whitelisted your wallet directly, <b>or</b> if you're in the published eligible-registrants Merkle tree (proof auto-filled below if <code>generated/eligibility-proofs.json</code> is reachable). Your stall stays <b>Pending</b> — and can't accept payments — until the organiser approves it.</p>
-      <div class="field-row">
-        <div class="field">
-          <label>Stall name</label>
-          <input id="stallNameInput" placeholder="e.g. Waffle Wonderland" />
-        </div>
+      <p class="hint">Your stall stays <b>Pending</b> — and can't accept payments — until the organiser approves it.</p>
+
+      <div class="elig-check" id="eligChecking">
+        <div class="empty-state"><span class="spinner"></span>&nbsp; Checking whether this wallet can apply…</div>
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Eligibility proof (auto-filled, or paste your own JSON array)</label>
-          <input id="proofInput" placeholder='e.g. ["0xabc...", "0xdef..."] — leave blank if whitelisted' />
-        </div>
+
+      <div class="elig-banner elig-yes" id="eligYes" style="display:none;">
+        ✓ This wallet is eligible to apply.
       </div>
-      <div class="actions"><button class="primary" id="registerBtn">Submit application</button></div>
+
+      <div class="elig-banner elig-no" id="eligNo" style="display:none;">
+        <b>This wallet isn't on the eligible list yet.</b>
+        <p>Ask the organiser to add your wallet address, or check back after they publish the eligibility list. Your address:</p>
+        <div class="addr" id="notEligibleAddr">—</div>
+      </div>
+
+      <div class="elig-banner elig-warn" id="eligUnknown" style="display:none;">
+        <b>Couldn't check your eligibility right now.</b>
+        <p>This is usually temporary — try refreshing the page in a minute. If it keeps happening, let the organiser know.</p>
+        <div class="actions"><button class="ghost" id="retryEligBtn">Try again</button></div>
+      </div>
+
+      <div id="applyForm" style="display:none;">
+        <div class="field-row">
+          <div class="field">
+            <label>Stall name</label>
+            <input id="stallNameInput" placeholder="e.g. Waffle Wonderland" />
+          </div>
+        </div>
+        <div class="actions"><button class="primary" id="registerBtn">Submit application</button></div>
+      </div>
     </section>
 
     <section class="panel subtle">

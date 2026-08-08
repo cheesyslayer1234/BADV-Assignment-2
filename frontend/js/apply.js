@@ -1,34 +1,99 @@
 /**
  * apply.js — page logic for apply.html (Apply for a Stall).
  * Requires wallet.js to be loaded first.
+ *
+ * Eligibility check flow — entirely automatic, applicant never sees or
+ * touches raw proof data:
+ *   1. Ask the contract if this wallet is on the organiser's whitelist.
+ *   2. If not, fetch frontend/generated/eligibility-proofs.json (written
+ *      by `npm run generate-merkle-root`) and see if it has a proof for
+ *      this wallet. If so, ask the contract to confirm that proof is
+ *      actually valid against the published root.
+ *   3. If neither path works, tell the applicant plainly they're not on
+ *      the list yet. If the check itself couldn't even run (e.g. the
+ *      eligibility file was unreachable), say so and offer a retry —
+ *      never fall back to a manual paste box.
+ *
+ * currentProof holds whatever proof (if any) was auto-detected for the
+ * connected wallet, and is what actually gets submitted with the
+ * application — the applicant only ever fills in the stall name.
  */
 
+let currentProof = []; // [] = registering via whitelist, non-empty = via Merkle proof
+
 document.addEventListener('wallet:ready', ()=>{
-  tryAutoFillProof();
+  checkEligibility();
   loadMyApplications();
 });
 document.addEventListener('wallet:disconnected', ()=>{
   document.getElementById('myApplicationsList').innerHTML =
     '<p class="empty-state">Connect your wallet to see your applications.</p>';
+  resetEligibilityBanners();
 });
 
-async function tryAutoFillProof(){
-  // Optional convenience: if this page is served alongside
-  // generated/eligibility-proofs.json (produced by
-  // scripts/generate-merkle-root.js), auto-fill the connected wallet's
-  // proof so they don't have to paste it manually. Silently does nothing
-  // if the file isn't reachable.
+function resetEligibilityBanners(){
+  document.getElementById('eligChecking').style.display = 'block';
+  document.getElementById('eligYes').style.display = 'none';
+  document.getElementById('eligNo').style.display = 'none';
+  document.getElementById('eligUnknown').style.display = 'none';
+  document.getElementById('applyForm').style.display = 'none';
+}
+
+function showEligible(){
+  resetEligibilityBanners();
+  document.getElementById('eligChecking').style.display = 'none';
+  document.getElementById('eligYes').style.display = 'block';
+  document.getElementById('applyForm').style.display = 'block';
+}
+
+function showNotEligible(){
+  resetEligibilityBanners();
+  document.getElementById('eligChecking').style.display = 'none';
+  document.getElementById('eligNo').style.display = 'block';
+  document.getElementById('notEligibleAddr').textContent = userAddress;
+}
+
+function showCouldNotCheck(){
+  resetEligibilityBanners();
+  document.getElementById('eligChecking').style.display = 'none';
+  document.getElementById('eligUnknown').style.display = 'block';
+}
+
+document.getElementById('retryEligBtn').addEventListener('click', checkEligibility);
+
+async function checkEligibility(){
+  resetEligibilityBanners();
+  currentProof = [];
+
+  let whitelisted = false;
   try{
-    const res = await fetch('../generated/eligibility-proofs.json');
-    if(!res.ok) return;
+    whitelisted = await contract.isAuthorisedRegistrant(userAddress);
+  }catch(err){
+    // couldn't even reach the chain for this read — treat as a soft
+    // failure and still try the proof-file path below before giving up.
+  }
+  if(whitelisted){
+    showEligible();
+    return;
+  }
+
+  try{
+    const res = await fetch('generated/eligibility-proofs.json');
+    if(!res.ok){ showCouldNotCheck(); return; }
     const data = await res.json();
     const proof = data.proofsByAddress && data.proofsByAddress[ethers.getAddress(userAddress)];
-    if(proof){
-      document.getElementById('proofInput').value = JSON.stringify(proof);
-      log('Eligibility proof auto-filled for this wallet.', 'ok');
+    if(!proof){ showNotEligible(); return; }
+    const validOnChain = await contract.isEligibleByProof(userAddress, proof);
+    if(validOnChain){
+      currentProof = proof;
+      showEligible();
+    }else{
+      // File is stale (organiser published a newer root since) — this
+      // wallet just isn't on the current list.
+      showNotEligible();
     }
   }catch(err){
-    // no proofs file reachable — fine, whitelist path still works
+    showCouldNotCheck();
   }
 }
 
@@ -72,24 +137,13 @@ document.getElementById('registerBtn').addEventListener('click', async ()=>{
   if(!contract){ log('Connect your wallet first.', 'err'); return; }
   const name = document.getElementById('stallNameInput').value.trim();
   if(!name){ log('Enter a stall name first.', 'err'); return; }
-  let proof = [];
-  const proofRaw = document.getElementById('proofInput').value.trim();
-  if(proofRaw){
-    try{
-      proof = JSON.parse(proofRaw);
-      if(!Array.isArray(proof)) throw new Error('not an array');
-    }catch(err){
-      log('Eligibility proof must be a JSON array of bytes32 hex strings.', 'err');
-      return;
-    }
-  }
+
   try{
-    const tx = await contract.registerStall(name, proof);
+    const tx = await contract.registerStall(name, currentProof);
     log(`Registering "${name}"…`);
     await tx.wait();
     log('Stall registered.', 'ok');
     document.getElementById('stallNameInput').value = '';
-    document.getElementById('proofInput').value = '';
     loadMyApplications();
   }catch(err){ log('Registration failed: ' + (err.reason || err.message || err), 'err'); }
 });

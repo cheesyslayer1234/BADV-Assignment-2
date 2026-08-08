@@ -4,5 +4,12 @@ cache/
 coverage/
 coverage.json
 .env
-generated/
 deployments/
+
+# NOTE: frontend/generated/eligibility-proofs.json is intentionally NOT
+# ignored. It has to be committed and pushed to main so GitHub Pages
+# actually serves it — otherwise apply.html can never auto-fill anyone's
+# eligibility proof, because the file it fetches simply isn't there on
+# the live site. Only the root-level scratch folder (if you ever use one)
+# is ignored below.
+/generated/

@@ -5,7 +5,10 @@
  * Anyone can open this page. What they see depends on their wallet:
  *   - no wallet connected        -> "connect your wallet" gate
  *   - connected, owns no stall   -> inline "you don't own a stall" message
- *   - connected, owns a stall    -> the refund/withdraw tools + their stall list
+ *   - connected, owns a stall    -> refund/withdraw controls on each stall's own card
+ *
+ * Refund and withdraw actions live directly on each stall's card, bound
+ * to that stall's ID via closure — nobody has to know or type a stall ID.
  */
 
 function showState(id){
@@ -23,7 +26,7 @@ document.addEventListener('wallet:ready', async ()=>{
   try{
     const myStalls = await findMyStalls();
     if(myStalls.length > 0){
-      renderMyStalls(myStalls);
+      await renderMyStalls(myStalls);
       showState('ownerTools');
     }else{
       document.getElementById('connectedAddrDisplay').textContent = userAddress;
@@ -47,47 +50,81 @@ async function findMyStalls(){
   return mine;
 }
 
-function renderMyStalls(myStalls){
+async function renderMyStalls(myStalls){
   const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
   const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
   const list = document.getElementById('myStallsList');
   list.innerHTML = '';
+
+  let withdrawalWindowOpen = false;
+  try{ withdrawalWindowOpen = await contract.isWithdrawalWindowOpen(); }catch(err){ /* default false */ }
+
   myStalls.forEach(s=>{
     const status = Number(s.status);
     const card = document.createElement('div');
     card.className = 'stall-card';
+
+    let actionsHtml = '';
+    if(status === 2){ // Approved — only approved stalls can hold/refund/withdraw balance
+      const canWithdraw = withdrawalWindowOpen && Number(s.balance) > 0 && !s.withdrawn;
+      actionsHtml = `
+        <div class="stall-actions">
+          <div class="field-row">
+            <div class="field"><label>Payer address</label><input class="refund-payer" placeholder="0x..." /></div>
+            <div class="field"><label>Amount (ETH)</label><input class="refund-amount" placeholder="0.1" /></div>
+          </div>
+          <div class="actions">
+            <button class="ghost refund-btn">Refund this customer</button>
+            <button class="primary withdraw-btn" ${canWithdraw ? '' : 'disabled'}>Withdraw funds</button>
+          </div>
+          ${s.withdrawn ? '<p class="hint">Already withdrawn.</p>' :
+            (!withdrawalWindowOpen ? '<p class="hint">Withdrawals open once the organiser processes the carnival close-out, plus one further day.</p>' :
+             Number(s.balance) === 0 ? '<p class="hint">Nothing to withdraw yet.</p>' : '')}
+        </div>
+      `;
+    }
+
     card.innerHTML = `
       <div class="id-tag">STALL #${s.id}</div>
       <span class="status-badge ${statusClasses[status]}">${statusNames[status]}</span>
       <h3>${s.name}</h3>
       <div class="meta"><span>Balance</span><b>${ethers.formatEther(s.balance)} ETH</b></div>
       <div class="meta"><span>Total received</span><b>${ethers.formatEther(s.totalPaid)} ETH</b></div>
-      ${s.withdrawn ? '<p class="hint">Already withdrawn.</p>' : ''}
+      ${status===1 ? '<p class="hint">Awaiting organiser approval.</p>' : ''}
+      ${status===3 ? '<p class="hint">This application was rejected.</p>' : ''}
+      ${actionsHtml}
     `;
+
+    if(status === 2){
+      card.querySelector('.refund-btn').addEventListener('click', async ()=>{
+        const payer = card.querySelector('.refund-payer').value.trim();
+        const amount = card.querySelector('.refund-amount').value;
+        if(!payer || !amount){ log('Enter a payer address and an amount first.', 'err'); return; }
+        try{
+          const tx = await contract.issueRefund(s.id, payer, ethers.parseEther(amount));
+          log(`Refunding ${amount} ETH to ${payer.slice(0,8)}… from stall #${s.id}`);
+          await tx.wait();
+          log('Refund sent.', 'ok');
+          document.dispatchEvent(new CustomEvent('wallet:ready')); // cheap way to re-fetch balances
+        }catch(err){ log('Refund failed: ' + (err.reason || err.message || err), 'err'); }
+      });
+
+      const withdrawBtn = card.querySelector('.withdraw-btn');
+      withdrawBtn.addEventListener('click', async ()=>{
+        withdrawBtn.disabled = true;
+        try{
+          const tx = await contract.withdrawFunds(s.id);
+          log(`Withdrawing funds for stall #${s.id}…`);
+          await tx.wait();
+          log('Withdrawal complete.', 'ok');
+          document.dispatchEvent(new CustomEvent('wallet:ready'));
+        }catch(err){
+          log('Withdrawal failed: ' + (err.reason || err.message || err), 'err');
+          withdrawBtn.disabled = false;
+        }
+      });
+    }
+
     list.appendChild(card);
   });
 }
-
-document.getElementById('refundBtn').addEventListener('click', async ()=>{
-  if(!contract){ log('Connect your wallet first.', 'err'); return; }
-  const stallId = document.getElementById('refundStallId').value;
-  const payer = document.getElementById('refundPayer').value.trim();
-  const amount = document.getElementById('refundAmount').value;
-  try{
-    const tx = await contract.issueRefund(stallId, payer, ethers.parseEther(amount));
-    log(`Refunding ${amount} ETH to ${payer.slice(0,8)}…`);
-    await tx.wait();
-    log('Refund sent.', 'ok');
-  }catch(err){ log('Refund failed: ' + (err.reason || err.message || err), 'err'); }
-});
-
-document.getElementById('withdrawBtn').addEventListener('click', async ()=>{
-  if(!contract){ log('Connect your wallet first.', 'err'); return; }
-  const stallId = document.getElementById('withdrawStallId').value;
-  try{
-    const tx = await contract.withdrawFunds(stallId);
-    log(`Withdrawing funds for stall #${stallId}…`);
-    await tx.wait();
-    log('Withdrawal complete.', 'ok');
-  }catch(err){ log('Withdrawal failed: ' + (err.reason || err.message || err), 'err'); }
-});

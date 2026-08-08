@@ -17,6 +17,8 @@ test/
   CarnivalStallManager.test.js  # 42-case Hardhat/Chai unit test suite
 scripts/
   deploy.js                  # local/testnet deployment script
+  generate-merkle-root.js    # builds the eligibility root + per-wallet proofs file
+eligible-registrants.example.json  # copy to eligible-registrants.json with your real list
 frontend/
   index.html, apply.html,
   browse.html, manage.html,
@@ -26,6 +28,7 @@ frontend/
   js/wallet.js               # shared wallet connect + contract config
   js/apply.js, browse.js,
   js/manage.js, organiser.js # page-specific logic
+  generated/eligibility-proofs.json  # written by generate-merkle-root.js, committed (not gitignored)
 .github/workflows/ci.yml     # CI/CD pipeline: compile + test + coverage on every push,
                               # then auto-deploy to Sepolia and publish frontend/ to
                               # GitHub Pages on push to main (see CD-SETUP.md)
@@ -94,8 +97,22 @@ The deploy script automatically writes the deployed address into
    a second, cheaper eligibility path (`registerStall` accepts either).
    Leaves use the standard double-hash convention
    (`keccak256(keccak256(abi.encode(address)))`) to guard against
-   second-preimage attacks on the tree. See `scripts/generate-merkle-root.js`
-   for the off-chain tree-building/proof-generation tooling.
+   second-preimage attacks on the tree.
+
+   **Organiser workflow** (no crypto background needed):
+   1. Copy `eligible-registrants.example.json` to `eligible-registrants.json`
+      and put your real list of eligible wallet addresses in it.
+   2. Run `npm run generate-merkle-root`. It prints the root to publish and
+      writes `frontend/generated/eligibility-proofs.json`.
+   3. Commit and push that generated file (it's intentionally **not**
+      gitignored — Pages has to serve it), then paste the printed root into
+      the Organiser Desk's "Eligible-registrants list" panel and publish it.
+
+   From there it's invisible to applicants: `apply.html` fetches that file
+   itself and fills in the right proof for whichever wallet is connected,
+   so nobody ever sees or pastes raw proof data. Re-run the script and
+   repeat step 3 any time the eligible list changes — publishing a new root
+   automatically invalidates old proofs.
 2. **CI/CD pipeline + unit test suite** — a Hardhat/Chai test suite
    covering every core requirement plus the Merkle-proof feature, backed by
    GitHub Actions (`.github/workflows/ci.yml`), which runs `hardhat compile`

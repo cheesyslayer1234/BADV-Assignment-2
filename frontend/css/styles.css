@@ -427,3 +427,62 @@ footer.site-footer{
   .landing-hero{padding:56px 18px 48px;}
   .landing-section{padding:44px 18px;}
 }
+
+/* ---------- Eligibility check (apply.html) ---------- */
+.elig-banner{
+  border-radius:var(--radius-md); padding:14px 16px; margin-bottom:18px; font-size:13.5px; line-height:1.6;
+}
+.elig-banner.elig-yes{
+  background:var(--green-soft); color:var(--green); font-weight:700;
+}
+.elig-banner.elig-no{
+  background:var(--red-soft); color:var(--red-deep);
+}
+.elig-banner.elig-no b{display:block; margin-bottom:4px;}
+.elig-banner.elig-no p{margin:0 0 10px; color:var(--ink-soft); font-weight:400;}
+.advanced-block{
+  margin-top:18px; padding-top:14px; border-top:1px dashed var(--line); font-size:13px;
+}
+.advanced-block summary{
+  cursor:pointer; font-weight:600; color:var(--ink-soft); user-select:none;
+}
+.advanced-block summary:hover{color:var(--ink);}
+.advanced-block .hint{margin-top:10px;}
+.addr{
+  font-family:'Space Mono',monospace; font-size:11.5px; background:var(--mist);
+  border-radius:var(--radius-sm); padding:8px 12px; word-break:break-all; color:var(--ink-soft);
+}
+
+/* ---------- Organiser: application review cards ---------- */
+.review-card{
+  background:var(--paper); border:1px solid var(--line-soft); border-radius:var(--radius-md);
+  padding:16px 18px; margin-bottom:12px; display:flex; flex-wrap:wrap; align-items:center; gap:14px;
+}
+.review-card .review-info{flex:1; min-width:200px;}
+.review-card .review-info h4{margin:0 0 3px; font-family:'Archivo',sans-serif; font-size:15.5px;}
+.review-card .review-info .owner{
+  font-family:'Space Mono',monospace; font-size:11px; color:var(--ink-faint); word-break:break-all;
+}
+.review-card .review-info .applied-at{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+.review-card .actions{gap:8px;}
+.section-toggle{
+  background:none; border:none; color:var(--red); font-weight:700; font-size:13px; cursor:pointer;
+  padding:4px 0; margin-bottom:10px; display:inline-flex; align-items:center; gap:6px;
+}
+.section-toggle .chev{transition:transform .18s ease; display:inline-block;}
+.section-toggle[aria-expanded="true"] .chev{transform:rotate(90deg);}
+
+/* ---------- Manage: per-stall action forms ---------- */
+.stall-card .stall-actions{
+  margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);
+  display:flex; flex-direction:column; gap:8px;
+}
+.stall-card .stall-actions .field-row{margin-bottom:0;}
+.stall-card .stall-actions .field{min-width:0;}
+.stall-card .stall-actions .field input{padding:8px 10px; font-size:12.5px;}
+.stall-card .stall-actions .field label{font-size:10px;}
+.elig-banner.elig-warn{
+  background:var(--gold-soft); color:#8a6512;
+}
+.elig-banner.elig-warn b{display:block; margin-bottom:4px;}
+.elig-banner.elig-warn p{margin:0 0 10px; color:var(--ink-soft); font-weight:400;}
