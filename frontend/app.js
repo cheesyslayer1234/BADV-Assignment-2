@@ -10,7 +10,7 @@
  *   2. Paste the deployed address into CONTRACT_ADDRESS below.
  */
 
-const CONTRACT_ADDRESS = "0x9D7f74d0C41E726EC95884E0e97Fa6129e3b5E99";
+const CONTRACT_ADDRESS = "0xd2a5bC10698FD955D1Fe6cb468a17809A08fd005";
 
 const ABI = [
   "function organiser() view returns (address)",

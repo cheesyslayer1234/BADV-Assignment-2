@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Apply for a Stall — CCN Day Carnival</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js"></script>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <svg class="crest" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="24" cy="24" r="22.5" fill="#C8102E"/>
+          <circle cx="24" cy="24" r="22.5" fill="none" stroke="#B8862F" stroke-width="1.5"/>
+          <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+          <path d="M24 12 L24 27 M17 17 C17 22 20 25 24 27 C28 25 31 22 31 17" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="24" cy="34" r="2" fill="#B8862F"/>
+        </svg>
+        <div class="brand-text">
+          <span class="kicker">Campus Care Network</span>
+          <span class="title">CCN Day · Stall Exchange</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div id="statusPill" class="status-pill">Wallet not connected</div>
+        <button class="connect" id="connectBtn">Connect Wallet</button>
+        <button class="connect outline" id="disconnectBtn" style="display:none;">Disconnect</button>
+        <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer" aria-label="Site menu">
+    <div class="drawer-head">
+      <span>Menu</span>
+      <button class="drawer-close" id="drawerClose" aria-label="Close menu">✕</button>
+    </div>
+    <nav>
+      <a href="index.html"><span>About CCN Day</span><small>What the carnival is, when &amp; where</small></a>
+      <a href="apply.html" class="active"><span>Apply for a Stall</span><small>Register your stall — you are here</small></a>
+      <a href="browse.html"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall</small></a>
+      <a href="manage.html"><span>My Stall Tools</span><small>Refunds &amp; withdrawals</small></a>
+      <a href="organiser.html"><span>Organiser Desk</span><small>Approvals, whitelist, close-out</small></a>
+    </nav>
+    <div class="drawer-foot">CONTRACT <span id="drawerContractAddr">—</span></div>
+  </aside>
+
+  <div class="wrap" style="padding-top:32px;">
+
+    <section class="panel subtle" style="margin-top:0;">
+      <h2>Apply for a Stall</h2>
+      <p class="hint">Contract <b id="contractAddrShort">not set</b> · Network <b id="networkName">—</b></p>
+    </section>
+
+    <section class="panel">
+      <h2>Submit your application</h2>
+      <p class="hint">Eligible if the organiser whitelisted your wallet directly, <b>or</b> if you're in the published eligible-registrants Merkle tree (proof auto-filled below if <code>generated/eligibility-proofs.json</code> is reachable). Your stall stays <b>Pending</b> — and can't accept payments — until the organiser approves it.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Stall name</label>
+          <input id="stallNameInput" placeholder="e.g. Waffle Wonderland" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Eligibility proof (auto-filled, or paste your own JSON array)</label>
+          <input id="proofInput" placeholder='e.g. ["0xabc...", "0xdef..."] — leave blank if whitelisted' />
+        </div>
+      </div>
+      <div class="actions"><button class="primary" id="registerBtn">Submit application</button></div>
+    </section>
+
+    <section class="panel subtle">
+      <h2>Your applications</h2>
+      <p class="hint">Stalls registered under the connected wallet, and their current status.</p>
+      <div class="stall-grid" id="myApplicationsList">
+        <p class="empty-state">Connect your wallet to see your applications.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="title">CCN Day Carnival</div>
+        <p>Campus Care Network — bringing TP students and staff together twice a year to raise funds for students in need, in the spirit of caring and sharing.</p>
+      </div>
+      <div class="footer-meta">
+        Built on CarnivalStallManager.sol<br/>
+        Independent student project — design inspired by TP's visual identity, not an official TP site.
+      </div>
+    </div>
+    <div class="footer-bar">CCN Day Carnival 2026 — Stall Exchange</div>
+  </footer>
+
+<script src="wallet.js"></script>
+<script src="apply.js"></script>
+</body>
+</html>
