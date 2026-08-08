@@ -18,7 +18,14 @@ test/
 scripts/
   deploy.js                  # local/testnet deployment script
 frontend/
-  index.html                 # standalone web interface (ethers.js + MetaMask)
+  index.html, apply.html,
+  browse.html, manage.html,
+  organiser.html             # standalone web interface (ethers.js + MetaMask)
+  css/styles.css             # shared styling
+  js/config.js               # deployed contract address (auto-written by scripts/deploy.js)
+  js/wallet.js               # shared wallet connect + contract config
+  js/apply.js, browse.js,
+  js/manage.js, organiser.js # page-specific logic
 .github/workflows/ci.yml     # CI/CD pipeline: compile + test + coverage on every push,
                               # then auto-deploy to Sepolia on push to main
 deployments/                  # deployment records written by scripts/deploy.js (gitignored)
@@ -41,9 +48,9 @@ npx hardhat node                       # terminal 1
 npx hardhat run scripts/deploy.js --network localhost   # terminal 2
 ```
 
-Copy the deployed address printed by the deploy script into
-`CONTRACT_ADDRESS` near the top of `frontend/index.html`'s `<script>` block,
-then open `frontend/index.html` in a browser with MetaMask connected to
+The deploy script automatically writes the deployed address into
+`frontend/js/config.js` — no manual editing needed. Just open
+`frontend/index.html` in a browser with MetaMask connected to
 `http://127.0.0.1:8545` (chain id `31337`).
 
 ## Core requirements implemented

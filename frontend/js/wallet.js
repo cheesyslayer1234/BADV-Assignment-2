@@ -10,9 +10,21 @@
  * Each page includes this file, then its own page script (stalls.js /
  * manage.js / organiser.js) which calls initWallet() and reacts to the
  * `wallet:ready` event once a signer + contract are available.
+ *
+ * CONTRACT_ADDRESS itself is NOT defined here anymore — it comes from
+ * config.js, which must be loaded via <script src="config.js"></script>
+ * BEFORE this file. config.js is auto-written by scripts/deploy.js on
+ * every deploy, so the frontend always points at whatever you last
+ * deployed without any manual editing.
  */
 
-const CONTRACT_ADDRESS = "0xd2a5bC10698FD955D1Fe6cb468a17809A08fd005";
+if (typeof CONTRACT_ADDRESS === "undefined") {
+  throw new Error(
+    "CONTRACT_ADDRESS is not defined — make sure config.js is included " +
+      "with a <script> tag BEFORE wallet.js, and that you've deployed at " +
+      "least once (npm run deploy:local or npm run deploy:sepolia)."
+  );
+}
 
 const ABI = [
   "function organiser() view returns (address)",
