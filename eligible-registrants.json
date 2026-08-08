@@ -1,7 +1,0 @@
-{
-  "//": "Here contains the list of eligible registrant wallet addresses. To generate the Merkle root, run: npm run generate-merkle-root",
-  "addresses": [
-    "0x803CEbC480517BB04446Ae9abb6C7FA591380a5b",
-    "0x313A25D8d65f0b6427D6c5381c96B4260642aD79"
-  ]
-}
