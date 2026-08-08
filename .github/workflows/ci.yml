@@ -36,9 +36,13 @@ jobs:
     name: Deploy to Sepolia testnet
     needs: build-and-test
     runs-on: ubuntu-latest
-    # Only deploy on a real push to main (not on pull requests), so forks/PRs
-    # never get access to the deployment secrets.
+    # Only deploy on a real push to main (not on pull requests, and not on
+    # the auto-commit this job makes below — see [skip ci] on that commit),
+    # so forks/PRs never get access to the deployment secrets and we never
+    # trigger an infinite deploy -> commit -> deploy loop.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write # needed to commit the redeployed address back to main
 
     steps:
       - name: Checkout repository
@@ -72,3 +76,54 @@ jobs:
         run: |
           echo "### 🚀 Deployed to Sepolia" >> $GITHUB_STEP_SUMMARY
           cat deployments/sepolia.json >> $GITHUB_STEP_SUMMARY
+
+      # deploy.js overwrites frontend/js/config.js locally on the runner
+      # with the freshly deployed address, but that change only exists in
+      # this ephemeral job unless we push it back — without this step the
+      # live frontend (served locally, or via GitHub Pages below) would
+      # keep pointing at whatever address was last committed, silently
+      # going stale every time this job redeploys the contract.
+      - name: Commit updated frontend config back to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- frontend/js/config.js; then
+            echo "config.js unchanged, nothing to commit."
+          else
+            git add frontend/js/config.js
+            # [skip ci] stops this push from re-triggering the workflow
+            # and looping back into another deploy.
+            git commit -m "chore: sync frontend config to latest Sepolia deploy [skip ci]"
+            git push
+          fi
+
+  deploy-pages:
+    name: Publish frontend to GitHub Pages
+    needs: deploy-testnet
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        # Check out the branch head rather than the commit that triggered
+        # this run, so we pick up deploy-testnet's [skip ci] config.js
+        # commit above instead of publishing a stale address.
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Upload frontend as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+

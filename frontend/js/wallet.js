@@ -52,6 +52,23 @@ const ABI = [
 ];
 
 let provider, signer, contract, userAddress;
+let isWrongNetwork = false; // true while the button reads "Switch to <network>"
+
+/* ---------------- Network validation ----------------
+ * CONTRACT_NETWORK (from config.js) says which network the currently
+ * configured CONTRACT_ADDRESS was actually deployed to. If the wallet is
+ * connected to a *different* chain, CONTRACT_ADDRESS either has no code
+ * there or points at an unrelated contract — every read/write will fail
+ * with an opaque "missing revert data" / CALL_EXCEPTION, because the call
+ * never reaches real contract code to produce a revert reason. We check
+ * this up front and refuse to bind the contract on a mismatch, instead of
+ * letting every page script hit that confusing error independently. */
+const CHAIN_IDS_BY_NETWORK = {
+  localhost: 31337n,
+  hardhat: 31337n,
+  sepolia: 11155111n,
+};
+const EXPECTED_CHAIN_ID = CHAIN_IDS_BY_NETWORK[CONTRACT_NETWORK];
 
 /* ---------------- Cross-page connection flag ----------------
  * MetaMask's `eth_accounts` call is silent (no popup) and will happily
@@ -102,8 +119,10 @@ function paintConnected(addr, net){
   const pill = document.getElementById('statusPill');
   const btn = document.getElementById('connectBtn');
   const disconnectBtn = document.getElementById('disconnectBtn');
+  isWrongNetwork = false;
   if(pill){
     pill.textContent = shortAddr(addr);
+    pill.classList.remove('is-error');
     pill.classList.add('is-connected');
   }
   if(btn){
@@ -124,9 +143,10 @@ function paintDisconnected(){
   const pill = document.getElementById('statusPill');
   const btn = document.getElementById('connectBtn');
   const disconnectBtn = document.getElementById('disconnectBtn');
+  isWrongNetwork = false;
   if(pill){
     pill.textContent = 'Wallet not connected';
-    pill.classList.remove('is-connected');
+    pill.classList.remove('is-connected', 'is-error');
   }
   if(btn){
     btn.textContent = 'Connect Wallet';
@@ -138,11 +158,76 @@ function paintDisconnected(){
   }
 }
 
+function paintWrongNetwork(net){
+  const pill = document.getElementById('statusPill');
+  const netEl = document.getElementById('networkName');
+  const btn = document.getElementById('connectBtn');
+  const disconnectBtn = document.getElementById('disconnectBtn');
+  if(pill){
+    pill.textContent = 'Wrong network';
+    pill.classList.remove('is-connected');
+    pill.classList.add('is-error');
+  }
+  if(netEl){
+    netEl.textContent = (net.name && net.name !== 'unknown' ? net.name : net.chainId.toString()) +
+      ` (expected ${CONTRACT_NETWORK})`;
+  }
+  // Not really "connect" in this state — repurpose the button to switch chains.
+  if(btn){
+    btn.textContent = `Switch to ${CONTRACT_NETWORK}`;
+    btn.disabled = false;
+    btn.style.display = '';
+  }
+  isWrongNetwork = true;
+  if(disconnectBtn){
+    disconnectBtn.style.display = '';
+  }
+}
+
+/** Asks MetaMask to switch to the network CONTRACT_ADDRESS was deployed on.
+ *  Only wired up for chains MetaMask already knows about (sepolia is a
+ *  well-known chain id it can switch to directly; a local hardhat node
+ *  isn't something we can safely auto-add since its RPC URL varies). */
+async function switchToExpectedNetwork(){
+  if(!window.ethereum || !EXPECTED_CHAIN_ID) return;
+  try{
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0x' + EXPECTED_CHAIN_ID.toString(16) }]
+    });
+    // MetaMask's chainChanged listener (wired below) reloads the page.
+  }catch(err){
+    toast(
+      `Couldn't switch automatically — please switch MetaMask to ${CONTRACT_NETWORK} manually.`,
+      'err'
+    );
+  }
+}
+
 async function bindWallet(){
   signer = await provider.getSigner();
   userAddress = await signer.getAddress();
-  contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
   const net = await provider.getNetwork();
+
+  if(EXPECTED_CHAIN_ID && net.chainId !== EXPECTED_CHAIN_ID){
+    // Wrong chain: CONTRACT_ADDRESS was deployed on CONTRACT_NETWORK, not
+    // whatever the wallet is currently pointed at. Do NOT construct the
+    // contract or fire wallet:ready — every read/write against it would
+    // fail with an opaque CALL_EXCEPTION ("missing revert data") because
+    // there's no matching contract code on this chain. Surface a clear,
+    // actionable message instead.
+    contract = undefined;
+    paintWrongNetwork(net);
+    toast(
+      `Wrong network: wallet is on ${net.name && net.name !== 'unknown' ? net.name : 'chain ' + net.chainId} ` +
+      `but this contract lives on ${CONTRACT_NETWORK}. Switch MetaMask and try again.`,
+      'err'
+    );
+    document.dispatchEvent(new CustomEvent('wallet:wrong-network', { detail: { net, expected: CONTRACT_NETWORK } }));
+    return;
+  }
+
+  contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
   paintConnected(userAddress, net);
   document.dispatchEvent(new CustomEvent('wallet:ready', { detail: { userAddress, contract } }));
 }
@@ -244,7 +329,7 @@ async function disconnectWallet(){
 
 document.addEventListener('DOMContentLoaded', ()=>{
   const btn = document.getElementById('connectBtn');
-  if(btn) btn.addEventListener('click', connectWallet);
+  if(btn) btn.addEventListener('click', ()=> isWrongNetwork ? switchToExpectedNetwork() : connectWallet());
   const disconnectBtn = document.getElementById('disconnectBtn');
   if(disconnectBtn) disconnectBtn.addEventListener('click', disconnectWallet);
   initWallet();

@@ -112,6 +112,29 @@ Go to the **Actions** tab on GitHub. You should see:
   pull requests — see the `if:` condition in `ci.yml`).
 - A run summary showing the deployed contract address.
 - A downloadable `sepolia-deployment` artifact containing `sepolia.json`.
+- A follow-up commit from `github-actions[bot]` syncing `frontend/js/config.js`
+  to the address it just deployed (message ends in `[skip ci]`, so it
+  won't re-trigger the workflow).
+- `deploy-pages` run last, publishing `frontend/` (with that just-synced
+  config) to GitHub Pages.
+
+## Step 7 — One-time GitHub Pages setup (~2 min)
+
+`deploy-pages` in `ci.yml` publishes the `frontend/` folder automatically
+on every push to `main`, but Pages needs to be told to accept deployments
+from Actions before that job can succeed:
+
+1. Go to your GitHub repo → **Settings** → **Pages**.
+2. Under **Build and deployment → Source**, choose **GitHub Actions**
+   (not "Deploy from a branch").
+3. That's it — no branch or folder to pick manually; the workflow handles
+   it. After the next push to `main`, your site will be live at
+   `https://<your-username>.github.io/<your-repo>/`.
+
+Because `deploy-testnet` commits the freshly deployed address back to
+`frontend/js/config.js` *before* `deploy-pages` runs (see Step 6), the
+published site always points at whichever contract was deployed by that
+same run — never a stale address.
 
 ## Things to double check
 
@@ -119,13 +142,19 @@ Go to the **Actions** tab on GitHub. You should see:
   `.gitignore`. If a real key is ever accidentally committed, treat that
   wallet as compromised — rotate it, even though it's testnet-only.
 - **Every push to `main` redeploys** the contract, producing a *new*
-  address each time (the constructor sets a fresh end time). If your report
-  or demo needs to reference one fixed address, either:
+  address each time (the constructor sets a fresh end time), and Pages
+  republishes to match. If your report or demo needs to reference one
+  fixed address, either:
   - deploy once manually and stop pushing to `main` after that, or
   - change the trigger to something less frequent, e.g. only on a git tag:
     ```yaml
     if: github.ref_type == 'tag'
     ```
+- **The bot's `[skip ci]` config-sync commit is expected**, not a bug —
+  without it `frontend/js/config.js` would silently go stale after every
+  CI redeploy. If you ever see the workflow apparently "run twice" per
+  push, check it's actually this sync commit (which is skipped) and not a
+  real second trigger.
 - **Faucets near the deadline can be flaky.** Get testnet ETH early.
 
 ## Cost summary

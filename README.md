@@ -27,7 +27,8 @@ frontend/
   js/apply.js, browse.js,
   js/manage.js, organiser.js # page-specific logic
 .github/workflows/ci.yml     # CI/CD pipeline: compile + test + coverage on every push,
-                              # then auto-deploy to Sepolia on push to main
+                              # then auto-deploy to Sepolia and publish frontend/ to
+                              # GitHub Pages on push to main (see CD-SETUP.md)
 deployments/                  # deployment records written by scripts/deploy.js (gitignored)
 CD-SETUP.md                  # one-time setup guide for the CD (Sepolia deploy) stage
 Report.docx                  # design report (see assignment brief)
