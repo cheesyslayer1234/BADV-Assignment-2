@@ -16,7 +16,7 @@ const STATUS_CLASSES = ['', 'status-pending', 'status-approved', 'status-rejecte
 
 function showState(id){
   ['checkingState','noWalletState','notOrganiserState','organiserTools'].forEach(s=>{
-    document.getElementById(s).style.display = (s===id) ? (s==='organiserTools' ? 'block' : 'block') : 'none';
+    document.getElementById(s).style.display = (s===id) ? 'block' : 'none';
   });
 }
 
