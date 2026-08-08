@@ -127,17 +127,24 @@ describe("CarnivalStallManager", function () {
       ).to.emit(contract, "PaymentMade");
     });
 
-    it("lets the organiser reject a pending application", async function () {
-      await expect(contract.connect(organiser).rejectStall(0))
+    it("lets the organiser reject a pending application with a reason", async function () {
+      await expect(contract.connect(organiser).rejectStall(0, "Missing food safety cert"))
         .to.emit(contract, "StallRejected")
-        .withArgs(0, organiser.address, anyValue);
+        .withArgs(0, organiser.address, "Missing food safety cert", anyValue);
 
       const stall = await contract.getStall(0);
       expect(stall.status).to.equal(3); // Rejected
+      expect(stall.rejectionReason).to.equal("Missing food safety cert");
+    });
+
+    it("requires a non-empty rejection reason", async function () {
+      await expect(
+        contract.connect(organiser).rejectStall(0, "")
+      ).to.be.revertedWithCustomError(contract, "EmptyRejectionReason");
     });
 
     it("permanently blocks payments to a rejected stall", async function () {
-      await contract.connect(organiser).rejectStall(0);
+      await contract.connect(organiser).rejectStall(0, "Not enough info");
       await expect(
         contract.connect(buyer1).payStall(0, { value: ethers.parseEther("1") })
       ).to.be.revertedWithCustomError(contract, "StallNotApproved");
@@ -148,7 +155,7 @@ describe("CarnivalStallManager", function () {
         contract.connect(stranger).approveStall(0)
       ).to.be.revertedWithCustomError(contract, "NotOrganiser");
       await expect(
-        contract.connect(stranger).rejectStall(0)
+        contract.connect(stranger).rejectStall(0, "nope")
       ).to.be.revertedWithCustomError(contract, "NotOrganiser");
     });
 
@@ -166,10 +173,115 @@ describe("CarnivalStallManager", function () {
     });
 
     it("cannot approve a stall that was already rejected", async function () {
-      await contract.connect(organiser).rejectStall(0);
+      await contract.connect(organiser).rejectStall(0, "Duplicate stall category");
       await expect(
         contract.connect(organiser).approveStall(0)
       ).to.be.revertedWithCustomError(contract, "StallNotPending");
+    });
+  });
+
+  describe("Additional Feature 1: Resubmission, cancellation & carnival-start gate", function () {
+    beforeEach(async function () {
+      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
+    });
+
+    it("lets a rejected owner update and resubmit, moving status back to Pending", async function () {
+      await contract.connect(organiser).rejectStall(0, "Needs a clearer description");
+
+      await expect(contract.connect(student).resubmitStall(0, "Waffle Wonderland v2"))
+        .to.emit(contract, "StallResubmitted")
+        .withArgs(0, student.address, anyValue);
+
+      const stall = await contract.getStall(0);
+      expect(stall.status).to.equal(1); // Pending
+      expect(stall.name).to.equal("Waffle Wonderland v2");
+      expect(stall.rejectionReason).to.equal("");
+
+      const stats = await contract.getCarnivalStats();
+      expect(stats.pendingCount).to.equal(1);
+      expect(stats.rejectedCount).to.equal(0);
+    });
+
+    it("blocks resubmission of a stall that isn't rejected", async function () {
+      await expect(
+        contract.connect(student).resubmitStall(0, "New name")
+      ).to.be.revertedWithCustomError(contract, "StallNotRejected");
+    });
+
+    it("blocks resubmission by anyone other than the stall owner", async function () {
+      await contract.connect(organiser).rejectStall(0, "Needs work");
+      await expect(
+        contract.connect(stranger).resubmitStall(0, "Hijack attempt")
+      ).to.be.revertedWithCustomError(contract, "NotStallOwner");
+    });
+
+    it("lets the organiser re-review a resubmitted application", async function () {
+      await contract.connect(organiser).rejectStall(0, "Needs work");
+      await contract.connect(student).resubmitStall(0, "Waffle Wonderland v2");
+
+      await expect(contract.connect(organiser).approveStall(0))
+        .to.emit(contract, "StallApproved");
+      const stall = await contract.getStall(0);
+      expect(stall.status).to.equal(2); // Approved
+    });
+
+    it("lets an approved owner cancel before the carnival starts", async function () {
+      await contract.connect(organiser).approveStall(0);
+
+      await expect(contract.connect(student).cancelStall(0))
+        .to.emit(contract, "StallCancelled")
+        .withArgs(0, student.address, anyValue);
+
+      const stall = await contract.getStall(0);
+      expect(stall.status).to.equal(4); // Cancelled
+
+      const stats = await contract.getCarnivalStats();
+      expect(stats.approvedCount).to.equal(0);
+      expect(stats.cancelledCount).to.equal(1);
+    });
+
+    it("blocks payments to a cancelled stall", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(student).cancelStall(0);
+
+      await expect(
+        contract.connect(buyer1).payStall(0, { value: ethers.parseEther("1") })
+      ).to.be.revertedWithCustomError(contract, "StallNotApproved");
+    });
+
+    it("only allows the stall owner to cancel", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await expect(
+        contract.connect(stranger).cancelStall(0)
+      ).to.be.revertedWithCustomError(contract, "NotStallOwner");
+    });
+
+    it("can only cancel a stall that is currently Approved", async function () {
+      await expect(
+        contract.connect(student).cancelStall(0) // still Pending
+      ).to.be.revertedWithCustomError(contract, "StallNotApproved");
+    });
+
+    it("blocks cancellation once the organiser has started the carnival", async function () {
+      await contract.connect(organiser).approveStall(0);
+      await contract.connect(organiser).startCarnival();
+
+      await expect(
+        contract.connect(student).cancelStall(0)
+      ).to.be.revertedWithCustomError(contract, "CarnivalAlreadyStarted");
+    });
+
+    it("only the organiser can start the carnival, and only once", async function () {
+      await expect(
+        contract.connect(stranger).startCarnival()
+      ).to.be.revertedWithCustomError(contract, "NotOrganiser");
+
+      await expect(contract.connect(organiser).startCarnival())
+        .to.emit(contract, "CarnivalStarted");
+
+      await expect(
+        contract.connect(organiser).startCarnival()
+      ).to.be.revertedWithCustomError(contract, "CarnivalAlreadyStarted");
     });
   });
 
@@ -416,7 +528,7 @@ describe("CarnivalStallManager", function () {
       expect(stats.rejectedCount).to.equal(0);
 
       await contract.connect(organiser).approveStall(0);
-      await contract.connect(organiser).rejectStall(1);
+      await contract.connect(organiser).rejectStall(1, "Duplicate category");
 
       stats = await contract.getCarnivalStats();
       expect(stats.pendingCount).to.equal(0);

@@ -11,8 +11,8 @@
  * clickable cards, so the organiser never has to know or type a stall ID.
  */
 
-const STATUS_NAMES = ['None', 'Pending', 'Approved', 'Rejected'];
-const STATUS_CLASSES = ['', 'status-pending', 'status-approved', 'status-rejected'];
+const STATUS_NAMES = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
+const STATUS_CLASSES = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
 
 function showState(id){
   ['checkingState','noWalletState','notOrganiserState','organiserTools'].forEach(s=>{
@@ -78,9 +78,11 @@ function renderPendingCard(s){
     }
   });
   card.querySelector('.reject-btn').addEventListener('click', async (e)=>{
+    const reason = (window.prompt(`Reason for rejecting "${s.name}" (shown to the applicant):`) || '').trim();
+    if(!reason){ log('A rejection reason is required.', 'err'); return; }
     e.target.disabled = true;
     try{
-      const tx = await contract.rejectStall(s.id);
+      const tx = await contract.rejectStall(s.id, reason);
       log(`Rejecting stall #${s.id} ("${s.name}")…`);
       await tx.wait();
       log('Stall rejected.', 'ok');
@@ -97,12 +99,17 @@ function renderDecidedCard(s){
   const status = Number(s.status);
   const card = document.createElement('div');
   card.className = 'stall-card';
+  let statusLine;
+  if(status === 2) statusLine = `Approved ${formatWhen(s.decidedAt)}`;
+  else if(status === 3) statusLine = `Rejected ${formatWhen(s.decidedAt)} — reason: ${s.rejectionReason}`;
+  else if(status === 4) statusLine = 'Cancelled by owner';
+  else statusLine = '';
   card.innerHTML = `
     <div class="id-tag">STALL #${s.id}</div>
     <span class="status-badge ${STATUS_CLASSES[status]}">${STATUS_NAMES[status]}</span>
     <h3>${s.name}</h3>
     <div class="owner">${s.owner}</div>
-    <p class="hint">${status===2 ? `Approved ${formatWhen(s.decidedAt)}` : `Rejected ${formatWhen(s.decidedAt)}`}</p>
+    <p class="hint">${statusLine}</p>
   `;
   return card;
 }
@@ -150,6 +157,20 @@ document.getElementById('decidedToggle').addEventListener('click', (e)=>{
   const expanded = list.style.display !== 'none';
   list.style.display = expanded ? 'none' : 'block';
   e.currentTarget.setAttribute('aria-expanded', String(!expanded));
+});
+
+document.getElementById('startCarnivalBtn').addEventListener('click', async (e)=>{
+  e.target.disabled = true;
+  try{
+    const tx = await contract.startCarnival();
+    log('Starting the carnival…');
+    await tx.wait();
+    log('Carnival started — approved stalls can no longer cancel.', 'ok');
+  }catch(err){
+    log('Failed: ' + (err.reason || err.message || err), 'err');
+  }finally{
+    e.target.disabled = false;
+  }
 });
 
 document.getElementById('processBtn').addEventListener('click', async ()=>{

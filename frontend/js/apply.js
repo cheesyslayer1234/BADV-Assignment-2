@@ -99,8 +99,8 @@ async function loadMyApplications(){
   list.innerHTML = '<p class="empty-state"><span class="spinner"></span>&nbsp; Loading…</p>';
   try{
     const count = await contract.stallCount();
-    const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
-    const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
+    const statusNames = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
+    const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
     const mine = [];
     for(let i=0; i<Number(count); i++){
       const s = await contract.getStall(i);
@@ -119,7 +119,12 @@ async function loadMyApplications(){
         <div class="id-tag">STALL #${s.id}</div>
         <span class="status-badge ${statusClasses[status]}">${statusNames[status]}</span>
         <h3>${s.name}</h3>
-        <p class="hint">${status===1 ? 'Awaiting organiser approval.' : status===2 ? 'Approved — visible on the Browse & Pay page.' : status===3 ? 'This application was rejected.' : ''}</p>
+        <p class="hint">${
+          status===1 ? 'Awaiting organiser approval.' :
+          status===2 ? 'Approved — visible on the Browse & Pay page.' :
+          status===3 ? `Rejected — reason: ${s.rejectionReason}. Head to My Stall Tools to edit and resubmit.` :
+          status===4 ? 'You cancelled this stall.' : ''
+        }</p>
       `;
       list.appendChild(card);
     });

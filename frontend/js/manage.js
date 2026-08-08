@@ -51,13 +51,16 @@ async function findMyStalls(){
 }
 
 async function renderMyStalls(myStalls){
-  const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
-  const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
+  const statusNames = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
+  const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
   const list = document.getElementById('myStallsList');
   list.innerHTML = '';
 
   let withdrawalWindowOpen = false;
   try{ withdrawalWindowOpen = await contract.isWithdrawalWindowOpen(); }catch(err){ /* default false */ }
+
+  let carnivalStarted = false;
+  try{ carnivalStarted = await contract.carnivalStarted(); }catch(err){ /* default false */ }
 
   myStalls.forEach(s=>{
     const status = Number(s.status);
@@ -65,7 +68,7 @@ async function renderMyStalls(myStalls){
     card.className = 'stall-card';
 
     let actionsHtml = '';
-    if(status === 2){ // Approved — only approved stalls can hold/refund/withdraw balance
+    if(status === 2){ // Approved — only approved stalls can hold/refund/withdraw balance, and cancel
       const canWithdraw = withdrawalWindowOpen && Number(s.balance) > 0 && !s.withdrawn;
       actionsHtml = `
         <div class="stall-actions">
@@ -80,6 +83,19 @@ async function renderMyStalls(myStalls){
           ${s.withdrawn ? '<p class="hint">Already withdrawn.</p>' :
             (!withdrawalWindowOpen ? '<p class="hint">Withdrawals open once the organiser processes the carnival close-out, plus one further day.</p>' :
              Number(s.balance) === 0 ? '<p class="hint">Nothing to withdraw yet.</p>' : '')}
+          <div class="actions">
+            <button class="ghost cancel-btn" ${carnivalStarted ? 'disabled' : ''}>Cancel this stall</button>
+          </div>
+          ${carnivalStarted ? '<p class="hint">The carnival has started — cancellation is no longer available.</p>' : ''}
+        </div>
+      `;
+    } else if(status === 3){ // Rejected — owner can edit and resubmit
+      actionsHtml = `
+        <div class="stall-actions">
+          <div class="field"><label>Updated stall name</label><input class="resubmit-name" value="${s.name}" /></div>
+          <div class="actions">
+            <button class="primary resubmit-btn">Resubmit application</button>
+          </div>
         </div>
       `;
     }
@@ -91,7 +107,8 @@ async function renderMyStalls(myStalls){
       <div class="meta"><span>Balance</span><b>${ethers.formatEther(s.balance)} ETH</b></div>
       <div class="meta"><span>Total received</span><b>${ethers.formatEther(s.totalPaid)} ETH</b></div>
       ${status===1 ? '<p class="hint">Awaiting organiser approval.</p>' : ''}
-      ${status===3 ? '<p class="hint">This application was rejected.</p>' : ''}
+      ${status===3 ? `<p class="hint">Rejected — reason: ${s.rejectionReason}</p>` : ''}
+      ${status===4 ? '<p class="hint">You cancelled this stall.</p>' : ''}
       ${actionsHtml}
     `;
 
@@ -121,6 +138,40 @@ async function renderMyStalls(myStalls){
         }catch(err){
           log('Withdrawal failed: ' + (err.reason || err.message || err), 'err');
           withdrawBtn.disabled = false;
+        }
+      });
+
+      const cancelBtn = card.querySelector('.cancel-btn');
+      cancelBtn.addEventListener('click', async ()=>{
+        if(!window.confirm(`Cancel stall #${s.id} ("${s.name}")? This cannot be undone.`)) return;
+        cancelBtn.disabled = true;
+        try{
+          const tx = await contract.cancelStall(s.id);
+          log(`Cancelling stall #${s.id}…`);
+          await tx.wait();
+          log('Stall cancelled.', 'ok');
+          document.dispatchEvent(new CustomEvent('wallet:ready'));
+        }catch(err){
+          log('Cancellation failed: ' + (err.reason || err.message || err), 'err');
+          cancelBtn.disabled = false;
+        }
+      });
+    }
+
+    if(status === 3){
+      card.querySelector('.resubmit-btn').addEventListener('click', async (e)=>{
+        const newName = card.querySelector('.resubmit-name').value.trim();
+        if(!newName){ log('Enter a stall name before resubmitting.', 'err'); return; }
+        e.target.disabled = true;
+        try{
+          const tx = await contract.resubmitStall(s.id, newName);
+          log(`Resubmitting stall #${s.id}…`);
+          await tx.wait();
+          log('Application resubmitted — awaiting organiser review.', 'ok');
+          document.dispatchEvent(new CustomEvent('wallet:ready'));
+        }catch(err){
+          log('Resubmission failed: ' + (err.reason || err.message || err), 'err');
+          e.target.disabled = false;
         }
       });
     }

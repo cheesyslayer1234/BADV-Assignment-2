@@ -19,10 +19,14 @@ async function loadStalls(){
     for(let i=0; i<Number(count); i++){
       const s = await contract.getStall(i);
 
-      const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
-      const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
+      const statusNames = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
+      const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
       const status = Number(s.status);
       const isApproved = status === 2;
+
+      let disabledHint = 'This application was rejected and cannot accept payments.';
+      if(status === 1) disabledHint = 'Awaiting organiser approval — payments are disabled until then.';
+      else if(status === 4) disabledHint = 'This stall was cancelled by its owner and cannot accept payments.';
 
       const card = document.createElement('div');
       card.className = 'stall-card';
@@ -38,7 +42,7 @@ async function loadStalls(){
         </div>
         <div class="actions">
           <button class="primary pay-btn">Pay stall</button>
-        </div>` : `<p class="hint">${status===1 ? 'Awaiting organiser approval — payments are disabled until then.' : 'This application was rejected and cannot accept payments.'}</p>`}
+        </div>` : `<p class="hint">${disabledHint}</p>`}
         `;
 
       if(isApproved){

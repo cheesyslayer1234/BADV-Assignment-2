@@ -93,15 +93,21 @@
           <h2 style="margin:0;">Pending applications</h2>
           <button class="ghost" id="refreshStallsBtn">Refresh</button>
         </div>
-        <p class="hint">New stall applications land here first. Approve turns one into a live stall that can accept payments; rejecting permanently blocks it. Both actions are one-way — no need to know or type a stall ID, just click the one you want.</p>
+        <p class="hint">New stall applications — including resubmitted ones — land here. Approve turns one into a live stall that can accept payments; rejecting requires a reason and lets the owner fix and resubmit. No need to know or type a stall ID, just click the one you want.</p>
         <div id="pendingList"><p class="empty-state"><span class="spinner"></span>&nbsp; Loading applications…</p></div>
       </section>
 
       <section class="panel subtle">
         <button class="section-toggle" id="decidedToggle" aria-expanded="false">
-          <span class="chev">▸</span> All stalls (approved &amp; rejected)
+          <span class="chev">▸</span> All stalls (approved, rejected &amp; cancelled)
         </button>
         <div id="decidedList" style="display:none;"><p class="empty-state">No decided stalls yet.</p></div>
+      </section>
+
+      <section class="panel">
+        <h2>Start the carnival</h2>
+        <p class="hint">Marks the carnival as underway. Once started, approved stall owners can no longer cancel their stall.</p>
+        <div class="actions"><button class="primary" id="startCarnivalBtn">Start carnival</button></div>
       </section>
 
       <section class="panel">
