@@ -48,7 +48,7 @@
       <a href="apply.html"><span>Apply for a Stall</span><small>Register your stall</small></a>
       <a href="browse.html"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall</small></a>
       <a href="manage.html"><span>My Stall Tools</span><small>Refunds &amp; withdrawals</small></a>
-      <a href="organiser.html" class="active"><span>Organiser Desk</span><small>Approvals, eligibility list, close-out — you are here</small></a>
+      <a href="organiser.html" class="active"><span>Organiser Desk</span><small>Approvals, close-out — you are here</small></a>
     </nav>
     <div class="drawer-foot">CONTRACT <span id="drawerContractAddr">—</span></div>
   </aside>
@@ -80,7 +80,7 @@
       <div class="gate">
         <div class="badge">⚠</div>
         <h2>Sorry, but you are not the organiser</h2>
-        <p>This wallet doesn't match the address that deployed the contract, so it can't approve stalls, manage the eligibility list, or close out the carnival.</p>
+        <p>This wallet doesn't match the address that deployed the contract, so it can't approve stalls or close out the carnival.</p>
         <div class="addr" id="connectedAddrDisplay">—</div>
       </div>
     </section>
@@ -116,58 +116,6 @@
         <div class="actions"><button class="primary" id="processBtn">Process carnival end</button></div>
       </section>
 
-      <section class="panel">
-        <h2>Eligible registrants</h2>
-        <p class="hint">
-          This is the whole eligibility system now — no more authorising wallets one-by-one on-chain.
-          Add or remove wallet addresses below; this page builds the Merkle tree and root for you, right
-          here in the browser. Nobody needs to understand Merkle trees, touch VS Code, or run any script.
-        </p>
-        <div class="field-row">
-          <div class="field"><label>Add wallet address</label><input id="newEligibleAddr" placeholder="0x..." /></div>
-        </div>
-        <div class="actions"><button class="primary" id="addEligibleBtn">Add to list</button></div>
-
-        <div id="eligibleListWrap" style="margin-top:16px;">
-          <p class="empty-state"><span class="spinner"></span>&nbsp; Loading current list…</p>
-        </div>
-
-        <div class="field-row" style="margin-top:16px;">
-          <div class="field">
-            <label>Root published on-chain right now</label>
-            <input id="currentRootDisplay" placeholder="—" disabled />
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label>Root computed from the list above</label>
-            <input id="computedRootDisplay" placeholder="—" disabled />
-          </div>
-        </div>
-        <p class="hint" id="rootStatusHint"></p>
-
-        <div class="actions">
-          <button class="primary" id="publishRootBtn">Publish root to blockchain</button>
-          <button class="ghost" id="copyListBtn">Copy updated list JSON</button>
-          <button class="ghost" id="downloadListBtn">Download updated list JSON</button>
-        </div>
-
-        <details style="margin-top:14px;">
-          <summary class="hint" style="cursor:pointer;">Why is there still one manual step?</summary>
-          <p class="hint" style="margin-top:8px;">
-            "Publish root to blockchain" is the part that actually matters — it's the one on-chain
-            source of truth, and it's a single click, right here. The list of raw addresses is only
-            used so applicants' browsers can work out <em>their own</em> proof automatically; it has to
-            live somewhere public for that. This project is a static site (no server of its own), so
-            after adding/removing addresses, use "Copy updated list JSON" and paste it over the contents
-            of <code>frontend/generated/eligible-registrants.json</code> using GitHub's own web editor
-            (open the file on github.com, click the pencil icon, paste, commit) — no git, no VS Code,
-            works from a phone. The site redeploys automatically within a minute or two. Applicants who
-            were already eligible aren't affected by this step; it only matters for people you've just
-            added or removed.
-          </p>
-        </details>
-      </section>
     </div>
 
   </div>
@@ -188,7 +136,6 @@
 
 <script src="js/config.js"></script>
 <script src="js/wallet.js"></script>
-<script src="js/merkle.js"></script>
 <script src="js/organiser.js"></script>
 </body>
 </html>

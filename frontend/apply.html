@@ -48,7 +48,7 @@
       <a href="apply.html" class="active"><span>Apply for a Stall</span><small>Register your stall — you are here</small></a>
       <a href="browse.html"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall</small></a>
       <a href="manage.html"><span>My Stall Tools</span><small>Refunds &amp; withdrawals</small></a>
-      <a href="organiser.html"><span>Organiser Desk</span><small>Approvals, eligibility list, close-out</small></a>
+      <a href="organiser.html"><span>Organiser Desk</span><small>Approvals, close-out</small></a>
     </nav>
     <div class="drawer-foot">CONTRACT <span id="drawerContractAddr">—</span></div>
   </aside>
@@ -64,27 +64,7 @@
       <h2>Submit your application</h2>
       <p class="hint">Your stall stays <b>Pending</b> — and can't accept payments — until the organiser approves it.</p>
 
-      <div class="elig-check" id="eligChecking">
-        <div class="empty-state"><span class="spinner"></span>&nbsp; Checking whether this wallet can apply…</div>
-      </div>
-
-      <div class="elig-banner elig-yes" id="eligYes" style="display:none;">
-        ✓ This wallet is eligible to apply.
-      </div>
-
-      <div class="elig-banner elig-no" id="eligNo" style="display:none;">
-        <b>This wallet isn't on the eligible list yet.</b>
-        <p>Ask the organiser to add your wallet address, or check back after they publish the eligibility list. Your address:</p>
-        <div class="addr" id="notEligibleAddr">—</div>
-      </div>
-
-      <div class="elig-banner elig-warn" id="eligUnknown" style="display:none;">
-        <b>Couldn't check your eligibility right now.</b>
-        <p>This is usually temporary — try refreshing the page in a minute. If it keeps happening, let the organiser know.</p>
-        <div class="actions"><button class="ghost" id="retryEligBtn">Try again</button></div>
-      </div>
-
-      <div id="applyForm" style="display:none;">
+      <div id="applyForm">
         <div class="field-row">
           <div class="field">
             <label>Stall name</label>
@@ -121,7 +101,6 @@
 
 <script src="js/config.js"></script>
 <script src="js/wallet.js"></script>
-<script src="js/merkle.js"></script>
 <script src="js/apply.js"></script>
 </body>
 </html>

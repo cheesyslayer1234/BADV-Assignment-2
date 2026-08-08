@@ -9,19 +9,13 @@
     "coverage": "hardhat coverage",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
-    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
-    "generate-merkle-root": "node scripts/generate-merkle-root.js"
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "dotenv": "^16.4.5",
     "ethers": "^6.14.0",
     "hardhat": "^2.22.0",
-    "keccak256": "^1.0.6",
-    "merkletreejs": "^0.6.0",
     "solc": "^0.8.24"
-  },
-  "dependencies": {
-    "@openzeppelin/contracts": "^5.6.1"
   }
 }

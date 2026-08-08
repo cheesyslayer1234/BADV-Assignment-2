@@ -2,31 +2,10 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
-const { MerkleTree } = require("merkletreejs");
-const keccak256 = require("keccak256");
-
-// Leaf convention must match the contract:
-// keccak256(keccak256(abi.encode(address))), i.e. a double-hashed leaf.
-function hashLeaf(address) {
-  return Buffer.from(
-    ethers.keccak256(
-      ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["address"], [address]))
-    ).slice(2),
-    "hex"
-  );
-}
-
-function buildTree(addresses) {
-  const leaves = addresses.map(hashLeaf);
-  return new MerkleTree(leaves, keccak256, { sortPairs: true });
-}
-
-const NO_PROOF = [];
 
 describe("CarnivalStallManager", function () {
   let contract, organiser, student, staff, buyer1, buyer2, stranger;
   let carnivalEndTime;
-  let eligibleTree, studentProof, staffProof;
 
   beforeEach(async function () {
     [organiser, student, staff, buyer1, buyer2, stranger] =
@@ -37,14 +16,6 @@ describe("CarnivalStallManager", function () {
     const Factory = await ethers.getContractFactory("CarnivalStallManager");
     contract = await Factory.deploy(carnivalEndTime);
     await contract.waitForDeployment();
-
-    // Eligibility is Merkle-proof only now, so every test that needs an
-    // "eligible" registrant publishes a root covering student + staff and
-    // uses the matching proof instead of an on-chain whitelist entry.
-    eligibleTree = buildTree([student.address, staff.address]);
-    await contract.connect(organiser).setEligibilityRoot(eligibleTree.getHexRoot());
-    studentProof = eligibleTree.getHexProof(hashLeaf(student.address));
-    staffProof = eligibleTree.getHexProof(hashLeaf(staff.address));
   });
 
   describe("Deployment", function () {
@@ -62,8 +33,8 @@ describe("CarnivalStallManager", function () {
   });
 
   describe("Requirement 1: Stall registration (application)", function () {
-    it("lets an eligible student submit a stall application", async function () {
-      await expect(contract.connect(student).registerStall("Bubble Tea", studentProof))
+    it("lets a student submit a stall application", async function () {
+      await expect(contract.connect(student).registerStall("Bubble Tea"))
         .to.emit(contract, "StallApplicationSubmitted")
         .withArgs(0, student.address, "Bubble Tea", anyValue);
 
@@ -75,28 +46,28 @@ describe("CarnivalStallManager", function () {
       expect(stall.decidedAt).to.equal(0);
     });
 
-    it("rejects registration from an ineligible address", async function () {
-      await expect(
-        contract.connect(stranger).registerStall("Illegal Stall", NO_PROOF)
-      ).to.be.revertedWithCustomError(contract, "NotEligibleToRegister");
+    it("lets any connected wallet submit a stall application (no eligibility gate)", async function () {
+      await expect(contract.connect(stranger).registerStall("Anyone's Stall"))
+        .to.emit(contract, "StallApplicationSubmitted")
+        .withArgs(0, stranger.address, "Anyone's Stall", anyValue);
     });
 
     it("rejects an empty stall name", async function () {
       await expect(
-        contract.connect(student).registerStall("", studentProof)
+        contract.connect(student).registerStall("")
       ).to.be.revertedWithCustomError(contract, "EmptyStallName");
     });
 
     it("increments stallCount for each new stall", async function () {
-      await contract.connect(student).registerStall("Stall A", studentProof);
-      await contract.connect(staff).registerStall("Stall B", staffProof);
+      await contract.connect(student).registerStall("Stall A");
+      await contract.connect(staff).registerStall("Stall B");
       expect(await contract.stallCount()).to.equal(2);
     });
   });
 
   describe("Requirement 1b: Organiser approval workflow", function () {
     beforeEach(async function () {
-      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
+      await contract.connect(student).registerStall("Waffle Wonderland");
     });
 
     it("starts a new application in Pending status", async function () {
@@ -182,7 +153,7 @@ describe("CarnivalStallManager", function () {
 
   describe("Additional Feature 1: Resubmission, cancellation & carnival-start gate", function () {
     beforeEach(async function () {
-      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
+      await contract.connect(student).registerStall("Waffle Wonderland");
     });
 
     it("lets a rejected owner update and resubmit, moving status back to Pending", async function () {
@@ -287,7 +258,7 @@ describe("CarnivalStallManager", function () {
 
   describe("Requirement 2: Public payments", function () {
     beforeEach(async function () {
-      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
+      await contract.connect(student).registerStall("Waffle Wonderland");
       await contract.connect(organiser).approveStall(0);
     });
 
@@ -317,7 +288,7 @@ describe("CarnivalStallManager", function () {
 
   describe("Requirement 3: Stall-owner refunds", function () {
     beforeEach(async function () {
-      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
+      await contract.connect(student).registerStall("Waffle Wonderland");
       await contract.connect(organiser).approveStall(0);
       await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("2") });
     });
@@ -368,7 +339,7 @@ describe("CarnivalStallManager", function () {
 
   describe("Requirement 4: Post-carnival withdrawal", function () {
     beforeEach(async function () {
-      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
+      await contract.connect(student).registerStall("Waffle Wonderland");
       await contract.connect(organiser).approveStall(0);
       await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("3") });
     });
@@ -435,90 +406,10 @@ describe("CarnivalStallManager", function () {
     });
   });
 
-  describe("Additional Feature: Merkle-proof eligibility", function () {
-    it("starts with an empty root, so proofs are rejected by default", async function () {
-      // Fresh, unconfigured deployment — the shared beforeEach above
-      // already publishes a root on `contract` for the other tests here.
-      const Factory = await ethers.getContractFactory("CarnivalStallManager");
-      const fresh = await Factory.deploy(carnivalEndTime);
-      await fresh.waitForDeployment();
-
-      expect(await fresh.eligibleRegistrantsRoot()).to.equal(ethers.ZeroHash);
-      expect(await fresh.isEligibleByProof(buyer1.address, [])).to.equal(false);
-    });
-
-    it("only the organiser can publish the eligibility root", async function () {
-      const tree = buildTree([buyer1.address]);
-      await expect(
-        contract.connect(stranger).setEligibilityRoot(tree.getHexRoot())
-      ).to.be.revertedWithCustomError(contract, "NotOrganiser");
-    });
-
-    it("emits EligibilityRootUpdated when the organiser publishes a root", async function () {
-      const tree = buildTree([buyer1.address, buyer2.address]);
-      await expect(contract.connect(organiser).setEligibilityRoot(tree.getHexRoot()))
-        .to.emit(contract, "EligibilityRootUpdated")
-        .withArgs(tree.getHexRoot());
-    });
-
-    it("lets any address in the published tree prove membership and register", async function () {
-      const eligible = [buyer1.address, buyer2.address, staff.address];
-      const tree = buildTree(eligible);
-      await contract.connect(organiser).setEligibilityRoot(tree.getHexRoot());
-
-      const proof = tree.getHexProof(hashLeaf(buyer1.address));
-      expect(await contract.isEligibleByProof(buyer1.address, proof)).to.equal(true);
-
-      await expect(contract.connect(buyer1).registerStall("Proof Popcorn", proof))
-        .to.emit(contract, "StallApplicationSubmitted")
-        .withArgs(0, buyer1.address, "Proof Popcorn", anyValue);
-
-      const stall = await contract.getStall(0);
-      expect(stall.owner).to.equal(buyer1.address);
-    });
-
-    it("rejects a proof for an address that isn't in the published tree", async function () {
-      const tree = buildTree([buyer1.address, buyer2.address]);
-      await contract.connect(organiser).setEligibilityRoot(tree.getHexRoot());
-
-      // stranger tries to reuse buyer1's proof for their own address.
-      const wrongProof = tree.getHexProof(hashLeaf(buyer1.address));
-      expect(await contract.isEligibleByProof(stranger.address, wrongProof)).to.equal(false);
-
-      await expect(
-        contract.connect(stranger).registerStall("Fake Stall", wrongProof)
-      ).to.be.revertedWithCustomError(contract, "NotEligibleToRegister");
-    });
-
-    it("rejects registration with an empty proof against a published root", async function () {
-      const tree = buildTree([buyer1.address]);
-      await contract.connect(organiser).setEligibilityRoot(tree.getHexRoot());
-
-      await expect(
-        contract.connect(stranger).registerStall("No Proof Stall", NO_PROOF)
-      ).to.be.revertedWithCustomError(contract, "NotEligibleToRegister");
-    });
-
-    it("rejects re-publishing so an old root/proof no longer verifies", async function () {
-      const firstTree = buildTree([buyer1.address]);
-      await contract.connect(organiser).setEligibilityRoot(firstTree.getHexRoot());
-      const staleProof = firstTree.getHexProof(hashLeaf(buyer1.address));
-
-      // organiser rotates the eligible list, buyer1 is dropped.
-      const secondTree = buildTree([buyer2.address]);
-      await contract.connect(organiser).setEligibilityRoot(secondTree.getHexRoot());
-
-      expect(await contract.isEligibleByProof(buyer1.address, staleProof)).to.equal(false);
-      await expect(
-        contract.connect(buyer1).registerStall("Late Stall", staleProof)
-      ).to.be.revertedWithCustomError(contract, "NotEligibleToRegister");
-    });
-  });
-
   describe("Additional Feature: Transparency accounting", function () {
     beforeEach(async function () {
-      await contract.connect(student).registerStall("Waffle Wonderland", studentProof);
-      await contract.connect(staff).registerStall("Iced Tea Stand", staffProof);
+      await contract.connect(student).registerStall("Waffle Wonderland");
+      await contract.connect(staff).registerStall("Iced Tea Stand");
     });
 
     it("tracks pending/approved/rejected counts as applications move through review", async function () {

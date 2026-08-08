@@ -1,97 +1,20 @@
 /**
  * apply.js — page logic for apply.html (Apply for a Stall).
- * Requires wallet.js and merkle.js to be loaded first.
+ * Requires wallet.js to be loaded first.
  *
- * Eligibility check flow — entirely automatic, applicant never sees or
- * touches raw proof data:
- *   1. Fetch frontend/generated/eligible-registrants.json — the plain,
- *      public list of eligible addresses the organiser maintains from the
- *      Organiser Desk.
- *   2. Build the Merkle tree client-side (merkle.js) and, if this wallet
- *      is in the list, compute its proof.
- *   3. Ask the contract to confirm that proof actually verifies against
- *      whatever root is currently published on-chain (guards against the
- *      list having gone stale since the organiser last published).
- *   4. If any of that fails to turn up a valid proof, tell the applicant
- *      plainly they're not on the list yet. If the check itself couldn't
- *      even run (e.g. the list file was unreachable), say so and offer a
- *      retry — never fall back to a manual paste box.
- *
- * currentProof holds whatever proof (if any) was auto-detected for the
- * connected wallet, and is what actually gets submitted with the
- * application — the applicant only ever fills in the stall name.
+ * Any connected wallet can submit an application — there is no on-chain
+ * eligibility gate. The organiser is the actual gatekeeper: every
+ * application starts Pending and only becomes usable once they approve it
+ * from the Organiser Desk.
  */
 
-let currentProof = [];
-
 document.addEventListener('wallet:ready', ()=>{
-  checkEligibility();
   loadMyApplications();
 });
 document.addEventListener('wallet:disconnected', ()=>{
   document.getElementById('myApplicationsList').innerHTML =
     '<p class="empty-state">Connect your wallet to see your applications.</p>';
-  resetEligibilityBanners();
 });
-
-function resetEligibilityBanners(){
-  document.getElementById('eligChecking').style.display = 'block';
-  document.getElementById('eligYes').style.display = 'none';
-  document.getElementById('eligNo').style.display = 'none';
-  document.getElementById('eligUnknown').style.display = 'none';
-  document.getElementById('applyForm').style.display = 'none';
-}
-
-function showEligible(){
-  resetEligibilityBanners();
-  document.getElementById('eligChecking').style.display = 'none';
-  document.getElementById('eligYes').style.display = 'block';
-  document.getElementById('applyForm').style.display = 'block';
-}
-
-function showNotEligible(){
-  resetEligibilityBanners();
-  document.getElementById('eligChecking').style.display = 'none';
-  document.getElementById('eligNo').style.display = 'block';
-  document.getElementById('notEligibleAddr').textContent = userAddress;
-}
-
-function showCouldNotCheck(){
-  resetEligibilityBanners();
-  document.getElementById('eligChecking').style.display = 'none';
-  document.getElementById('eligUnknown').style.display = 'block';
-}
-
-document.getElementById('retryEligBtn').addEventListener('click', checkEligibility);
-
-async function checkEligibility(){
-  resetEligibilityBanners();
-  currentProof = [];
-
-  try{
-    const res = await fetch('generated/eligible-registrants.json');
-    if(!res.ok){ showCouldNotCheck(); return; }
-    const data = await res.json();
-    const addresses = Array.isArray(data) ? data : data.addresses;
-    if(!Array.isArray(addresses)){ showCouldNotCheck(); return; }
-
-    const tree = Merkle.buildTree(addresses);
-    const proof = Merkle.getProof(tree, userAddress);
-    if(!proof){ showNotEligible(); return; }
-
-    const validOnChain = await contract.isEligibleByProof(userAddress, proof);
-    if(validOnChain){
-      currentProof = proof;
-      showEligible();
-    }else{
-      // List is stale (organiser published a newer root since this file
-      // was last updated) — this wallet just isn't on the current list.
-      showNotEligible();
-    }
-  }catch(err){
-    showCouldNotCheck();
-  }
-}
 
 async function loadMyApplications(){
   if(!contract) return;
@@ -140,7 +63,7 @@ document.getElementById('registerBtn').addEventListener('click', async ()=>{
   if(!name){ log('Enter a stall name first.', 'err'); return; }
 
   try{
-    const tx = await contract.registerStall(name, currentProof);
+    const tx = await contract.registerStall(name);
     log(`Registering "${name}"…`);
     await tx.wait();
     log('Stall registered.', 'ok');

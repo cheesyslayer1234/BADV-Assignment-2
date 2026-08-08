@@ -65,14 +65,14 @@ jobs:
       - name: Compile contracts
         run: npx hardhat compile
 
-      # A push that only touches operational data (the eligible-address
-      # list) or frontend copy has no reason to spin up a brand new
-      # contract — that would silently orphan every stall already
-      # registered on the currently-live address and reset its state to
-      # empty. Redeploy only when the contract source, deploy script, or
-      # Hardhat network config actually changed. `workflow_dispatch` (the
-      # manual button above) always deploys, in case you ever want to
-      # force a fresh instance without touching any file.
+      # A push that only touches frontend copy has no reason to spin up a
+      # brand new contract — that would silently orphan every stall
+      # already registered on the currently-live address and reset its
+      # state to empty. Redeploy only when the contract source, deploy
+      # script, or Hardhat network config actually changed.
+      # `workflow_dispatch` (the manual button above) always deploys, in
+      # case you ever want to force a fresh instance without touching any
+      # file.
       - name: Check whether contract-relevant files changed
         id: filter
         run: |
@@ -139,8 +139,8 @@ jobs:
     needs: deploy-testnet
     runs-on: ubuntu-latest
     # Always runs after deploy-testnet regardless of whether it actually
-    # deployed a new contract — a push that only updates the eligible-
-    # address list still needs the live site to serve the new list.
+    # deployed a new contract — a push that only updates frontend copy
+    # still needs the live site rebuilt.
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     permissions:
       pages: write

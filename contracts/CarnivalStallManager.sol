@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-
 contract CarnivalStallManager {
     error NotOrganiser();
-    error NotEligibleToRegister();
     error NotStallOwner(uint256 stallId);
     error StallDoesNotExist(uint256 stallId);
     error ReentrancyDetected();
@@ -26,11 +23,6 @@ contract CarnivalStallManager {
     error CarnivalAlreadyStarted();
 
     address public organiser;
-
-    // Merkle-proof path: organiser publishes one root representing the full
-    // set of eligible TP students/staff. Anyone in that set can register by
-    // submitting a proof, without the contract ever storing the full list.
-    bytes32 public eligibleRegistrantsRoot;
 
     uint256 public immutable carnivalEndTime;
 
@@ -83,9 +75,6 @@ contract CarnivalStallManager {
 
     mapping(uint256 => mapping(address => uint256)) private payerCredit;
 
-    mapping(uint256 => mapping(address => bool)) private hasPaidStall;
-
-    event EligibilityRootUpdated(bytes32 newRoot);
     event StallApplicationSubmitted(uint256 indexed stallId, address indexed applicant, string name, uint256 timestamp);
     event StallApproved(uint256 indexed stallId, address indexed organiser, uint256 timestamp);
     event StallRejected(uint256 indexed stallId, address indexed organiser, string reason, uint256 timestamp);
@@ -131,40 +120,16 @@ contract CarnivalStallManager {
         carnivalEndTime = _carnivalEndTime;
     }
 
-    /// @notice Organiser publishes/updates the Merkle root of eligible
-    /// TP students/staff addresses. Regenerating and re-publishing the
-    /// root is how the eligible list is updated, instead of writing every
-    /// address to storage individually.
-    function setEligibilityRoot(bytes32 newRoot) external onlyOrganiser {
-        eligibleRegistrantsRoot = newRoot;
-        emit EligibilityRootUpdated(newRoot);
-    }
-
-    /// @notice Checks whether `account` is included in the published
-    /// eligibility Merkle tree, given a proof. Leaves are double-hashed
-    /// (keccak256(keccak256(abi.encode(account)))) to match the standard
-    /// OpenZeppelin/`merkletreejs` convention and avoid second-preimage
-    /// attacks against the tree.
-    function isEligibleByProof(address account, bytes32[] calldata merkleProof)
-        public
-        view
-        returns (bool)
-    {
-        if (eligibleRegistrantsRoot == bytes32(0)) return false;
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(account))));
-        return MerkleProof.verify(merkleProof, eligibleRegistrantsRoot, leaf);
-    }
-
-    /// @notice Registers a stall application. The caller must supply a
-    /// valid Merkle proof that they belong to the published
-    /// eligible-registrants set.
-    function registerStall(string calldata name, bytes32[] calldata merkleProof)
+    /// @notice Registers a stall application. Any address may call this —
+    /// there is no on-chain eligibility gate; access control for who is a
+    /// genuine TP student/staff member is expected to be handled off-chain
+    /// (e.g. only sharing the dApp link/wallet-connect flow with them),
+    /// with the organiser as the actual gatekeeper via approveStall/
+    /// rejectStall.
+    function registerStall(string calldata name)
         external
         returns (uint256 stallId)
     {
-        if (!isEligibleByProof(msg.sender, merkleProof)) {
-            revert NotEligibleToRegister();
-        }
         if (bytes(name).length == 0) revert EmptyStallName();
 
         stallId = stallCount;
@@ -277,7 +242,6 @@ contract CarnivalStallManager {
         totalRaised += msg.value;
 
         payerCredit[stallId][msg.sender] += msg.value;
-        hasPaidStall[stallId][msg.sender] = true;
 
         emit PaymentMade(stallId, msg.sender, msg.value);
     }

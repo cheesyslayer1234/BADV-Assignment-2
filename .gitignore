@@ -5,12 +5,6 @@ coverage/
 coverage.json
 .env
 
-# NOTE: frontend/generated/eligible-registrants.json is intentionally NOT
-# ignored. It has to be committed and pushed to main so GitHub Pages
-# actually serves it — otherwise apply.html (and the Organiser Desk) can
-# never see the current eligible-address list, because the file they
-# fetch simply isn't there on the live site.
-#
-# deployments/ is also intentionally NOT ignored — deployments/sepolia.json
+# NOTE: deployments/ is intentionally NOT ignored — deployments/sepolia.json
 # is how the CI/CD pipeline's "did the deployed address change?" diff and
 # the frontend's config.js sync stay honest across runs.
