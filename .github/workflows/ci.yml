@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch: # manual "Run workflow" button in the Actions tab
 
 jobs:
   build-and-test:
@@ -36,17 +37,21 @@ jobs:
     name: Deploy to Sepolia testnet
     needs: build-and-test
     runs-on: ubuntu-latest
-    # Only deploy on a real push to main (not on pull requests, and not on
-    # the auto-commit this job makes below — see [skip ci] on that commit),
-    # so forks/PRs never get access to the deployment secrets and we never
-    # trigger an infinite deploy -> commit -> deploy loop.
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Only ever runs on a real push to main (not on pull requests, and not
+    # on the auto-commit this job makes below — see [skip ci] on that
+    # commit), so forks/PRs never get access to the deployment secrets and
+    # we never trigger an infinite deploy -> commit -> deploy loop.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     permissions:
       contents: write # needed to commit the redeployed address back to main
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Need at least the previous commit so the diff step below can
+          # tell whether this push actually touched contract code.
+          fetch-depth: 2
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -60,30 +65,62 @@ jobs:
       - name: Compile contracts
         run: npx hardhat compile
 
+      # A push that only touches operational data (the eligible-address
+      # list) or frontend copy has no reason to spin up a brand new
+      # contract — that would silently orphan every stall already
+      # registered on the currently-live address and reset its state to
+      # empty. Redeploy only when the contract source, deploy script, or
+      # Hardhat network config actually changed. `workflow_dispatch` (the
+      # manual button above) always deploys, in case you ever want to
+      # force a fresh instance without touching any file.
+      - name: Check whether contract-relevant files changed
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Manually triggered via workflow_dispatch — deploying regardless of diff."
+          elif git diff --quiet HEAD^ HEAD -- contracts/ scripts/deploy.js hardhat.config.js; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No contract-relevant files changed in this push — skipping deploy."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Contract-relevant files changed — deploying a new instance."
+          fi
+
       - name: Deploy to Sepolia
+        if: steps.filter.outputs.changed == 'true'
         run: npx hardhat run scripts/deploy.js --network sepolia
         env:
           SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
 
       - name: Upload deployment record
+        if: steps.filter.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sepolia-deployment
           path: deployments/sepolia.json
 
       - name: Add deployment summary
+        if: steps.filter.outputs.changed == 'true'
         run: |
-          echo "### 🚀 Deployed to Sepolia" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Deployed new contract to Sepolia" >> $GITHUB_STEP_SUMMARY
           cat deployments/sepolia.json >> $GITHUB_STEP_SUMMARY
+
+      - name: Add skipped-deploy summary
+        if: steps.filter.outputs.changed == 'false'
+        run: |
+          echo "### ⏭️ Deploy skipped" >> $GITHUB_STEP_SUMMARY
+          echo "No contract-relevant files changed in this push, so the existing Sepolia contract was left untouched. Only the frontend/Pages site was rebuilt." >> $GITHUB_STEP_SUMMARY
 
       # deploy.js overwrites frontend/js/config.js locally on the runner
       # with the freshly deployed address, but that change only exists in
       # this ephemeral job unless we push it back — without this step the
-      # live frontend (served locally, or via GitHub Pages below) would
-      # keep pointing at whatever address was last committed, silently
-      # going stale every time this job redeploys the contract.
+      # live frontend (served via GitHub Pages below) would keep pointing
+      # at whatever address was last committed, silently going stale
+      # every time this job redeploys the contract.
       - name: Commit updated frontend config back to main
+        if: steps.filter.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -101,7 +138,10 @@ jobs:
     name: Publish frontend to GitHub Pages
     needs: deploy-testnet
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Always runs after deploy-testnet regardless of whether it actually
+    # deployed a new contract — a push that only updates the eligible-
+    # address list still needs the live site to serve the new list.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     permissions:
       pages: write
       id-token: write
@@ -126,4 +166,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-

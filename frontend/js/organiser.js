@@ -31,6 +31,7 @@ document.addEventListener('wallet:ready', async ()=>{
     if(organiserAddr.toLowerCase() === userAddress.toLowerCase()){
       showState('organiserTools');
       loadStalls();
+      loadEligibleList();
       loadCurrentRoot();
     }else{
       document.getElementById('connectedAddrDisplay').textContent = userAddress;
@@ -151,26 +152,6 @@ document.getElementById('decidedToggle').addEventListener('click', (e)=>{
   e.currentTarget.setAttribute('aria-expanded', String(!expanded));
 });
 
-document.getElementById('addWhitelistBtn').addEventListener('click', async ()=>{
-  const addr = document.getElementById('whitelistAddr').value.trim();
-  try{
-    const tx = await contract.addAuthorisedRegistrant(addr);
-    log(`Authorising ${addr.slice(0,8)}…`);
-    await tx.wait();
-    log('Address authorised.', 'ok');
-  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
-});
-
-document.getElementById('removeWhitelistBtn').addEventListener('click', async ()=>{
-  const addr = document.getElementById('whitelistAddr').value.trim();
-  try{
-    const tx = await contract.removeAuthorisedRegistrant(addr);
-    log(`Revoking ${addr.slice(0,8)}…`);
-    await tx.wait();
-    log('Address revoked.', 'ok');
-  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
-});
-
 document.getElementById('processBtn').addEventListener('click', async ()=>{
   try{
     const tx = await contract.processCarnivalEnd();
@@ -180,29 +161,134 @@ document.getElementById('processBtn').addEventListener('click', async ()=>{
   }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
 });
 
+/* ---------------- Eligible registrants (client-side Merkle) ---------------- */
+
+let eligibleAddresses = []; // in-memory working copy of the published list
+let onChainRoot = null;
+
+async function loadEligibleList(){
+  const wrap = document.getElementById('eligibleListWrap');
+  wrap.innerHTML = '<p class="empty-state"><span class="spinner"></span>&nbsp; Loading current list…</p>';
+  try{
+    const res = await fetch('generated/eligible-registrants.json', { cache: 'no-store' });
+    const data = res.ok ? await res.json() : { addresses: [] };
+    const addresses = Array.isArray(data) ? data : (data.addresses || []);
+    eligibleAddresses = Merkle.normaliseAddresses(addresses);
+  }catch(err){
+    eligibleAddresses = [];
+    log('Could not load the current list — starting from an empty one. ' + (err.message || err), 'err');
+  }
+  renderEligibleList();
+  refreshComputedRoot();
+}
+
+function renderEligibleList(){
+  const wrap = document.getElementById('eligibleListWrap');
+  if(eligibleAddresses.length === 0){
+    wrap.innerHTML = '<p class="empty-state">No eligible wallets yet — add one above.</p>';
+    return;
+  }
+  wrap.innerHTML = '';
+  eligibleAddresses.forEach(addr=>{
+    const row = document.createElement('div');
+    row.className = 'review-card';
+    row.innerHTML = `
+      <div class="review-info"><div class="owner">${addr}</div></div>
+      <div class="actions"><button class="ghost remove-eligible-btn">Remove</button></div>
+    `;
+    row.querySelector('.remove-eligible-btn').addEventListener('click', ()=>{
+      eligibleAddresses = eligibleAddresses.filter(a=>a !== addr);
+      renderEligibleList();
+      refreshComputedRoot();
+    });
+    wrap.appendChild(row);
+  });
+}
+
+document.getElementById('addEligibleBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('newEligibleAddr');
+  const raw = input.value.trim();
+  if(!raw) return;
+  let checksummed;
+  try{
+    checksummed = ethers.getAddress(raw);
+  }catch(err){
+    log('That doesn\'t look like a valid wallet address.', 'err');
+    return;
+  }
+  if(eligibleAddresses.includes(checksummed)){
+    log('Already on the list.', 'err');
+    input.value = '';
+    return;
+  }
+  eligibleAddresses.push(checksummed);
+  input.value = '';
+  renderEligibleList();
+  refreshComputedRoot();
+});
+
+function refreshComputedRoot(){
+  const tree = Merkle.buildTree(eligibleAddresses);
+  const computedRoot = Merkle.getRoot(tree);
+  document.getElementById('computedRootDisplay').value = computedRoot;
+
+  const hint = document.getElementById('rootStatusHint');
+  if(onChainRoot === null){
+    hint.textContent = '';
+  }else if(computedRoot.toLowerCase() === onChainRoot.toLowerCase()){
+    hint.textContent = 'This matches what\'s published on-chain right now — nothing pending.';
+  }else{
+    hint.textContent = 'This differs from the published root — click "Publish root to blockchain" to make it live.';
+  }
+  return { tree, computedRoot };
+}
+
 async function loadCurrentRoot(){
   const el = document.getElementById('currentRootDisplay');
   try{
     const root = await contract.eligibleRegistrantsRoot();
     const isZero = /^0x0+$/.test(root);
+    onChainRoot = root;
     el.value = isZero ? 'Not published yet' : root;
   }catch(err){
+    onChainRoot = null;
     el.value = '—';
   }
+  refreshComputedRoot();
 }
 
-document.getElementById('setRootBtn').addEventListener('click', async ()=>{
-  const root = document.getElementById('rootInput').value.trim();
-  if(!/^0x[0-9a-fA-F]{64}$/.test(root)){
-    log('That doesn\'t look like a full root — paste exactly what generate-merkle-root.js printed.', 'err');
-    return;
-  }
+document.getElementById('publishRootBtn').addEventListener('click', async ()=>{
+  const { computedRoot } = refreshComputedRoot();
   try{
-    const tx = await contract.setEligibilityRoot(root);
-    log(`Publishing eligibility root ${root.slice(0,10)}…`);
+    const tx = await contract.setEligibilityRoot(computedRoot);
+    log(`Publishing eligibility root ${computedRoot.slice(0,10)}…`);
     await tx.wait();
     log('Eligibility root published.', 'ok');
-    document.getElementById('rootInput').value = '';
     loadCurrentRoot();
   }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
+});
+
+function buildListFileContents(){
+  return JSON.stringify({
+    "//": "Published, public list of eligible wallet addresses. Edited from the Organiser Desk (organiser.html) — no VS Code or npm script needed. apply.html fetches this file and computes its own Merkle proof client-side against whatever root the Organiser Desk most recently published on-chain.",
+    updatedAt: new Date().toISOString(),
+    addresses: eligibleAddresses
+  }, null, 2);
+}
+
+document.getElementById('copyListBtn').addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(buildListFileContents());
+    log('Copied — paste it over frontend/generated/eligible-registrants.json on GitHub.', 'ok');
+  }catch(err){ log('Could not copy automatically — use the download button instead.', 'err'); }
+});
+
+document.getElementById('downloadListBtn').addEventListener('click', ()=>{
+  const blob = new Blob([buildListFileContents()], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'eligible-registrants.json';
+  a.click();
+  URL.revokeObjectURL(url);
 });

@@ -29,13 +29,10 @@ if (typeof CONTRACT_ADDRESS === "undefined") {
 const ABI = [
   "function organiser() view returns (address)",
   "function stallCount() view returns (uint256)",
-  "function isAuthorisedRegistrant(address) view returns (bool)",
   "function isWithdrawalWindowOpen() view returns (bool)",
   "function eligibleRegistrantsRoot() view returns (bytes32)",
   "function isEligibleByProof(address account, bytes32[] merkleProof) view returns (bool)",
   "function setEligibilityRoot(bytes32 newRoot)",
-  "function addAuthorisedRegistrant(address account)",
-  "function removeAuthorisedRegistrant(address account)",
   "function registerStall(string name, bytes32[] merkleProof) returns (uint256)",
   "function approveStall(uint256 stallId)",
   "function rejectStall(uint256 stallId)",

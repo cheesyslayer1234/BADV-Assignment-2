@@ -48,7 +48,7 @@
       <a href="apply.html"><span>Apply for a Stall</span><small>Register your stall</small></a>
       <a href="browse.html"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall</small></a>
       <a href="manage.html"><span>My Stall Tools</span><small>Refunds &amp; withdrawals</small></a>
-      <a href="organiser.html" class="active"><span>Organiser Desk</span><small>Approvals, whitelist, close-out — you are here</small></a>
+      <a href="organiser.html" class="active"><span>Organiser Desk</span><small>Approvals, eligibility list, close-out — you are here</small></a>
     </nav>
     <div class="drawer-foot">CONTRACT <span id="drawerContractAddr">—</span></div>
   </aside>
@@ -80,7 +80,7 @@
       <div class="gate">
         <div class="badge">⚠</div>
         <h2>Sorry, but you are not the organiser</h2>
-        <p>This wallet doesn't match the address that deployed the contract, so it can't approve stalls, manage the whitelist, or close out the carnival.</p>
+        <p>This wallet doesn't match the address that deployed the contract, so it can't approve stalls, manage the eligibility list, or close out the carnival.</p>
         <div class="addr" id="connectedAddrDisplay">—</div>
       </div>
     </section>
@@ -105,50 +105,62 @@
       </section>
 
       <section class="panel">
-        <h2>Whitelist a student/staff wallet</h2>
-        <p class="hint">For adding one wallet at a time by hand. If you have a whole list of eligible students/staff, the Merkle root tool below is faster than authorising them one by one.</p>
-        <div class="field-row">
-          <div class="field"><label>Wallet address</label><input id="whitelistAddr" placeholder="0x..." /></div>
-        </div>
-        <div class="actions">
-          <button class="primary" id="addWhitelistBtn">Authorise</button>
-          <button class="ghost" id="removeWhitelistBtn">Revoke</button>
-        </div>
-      </section>
-
-      <section class="panel">
         <h2>Close out the carnival</h2>
         <p class="hint">Only callable once <code>carnivalEndTime</code> has passed. Opens the withdrawal window the following day.</p>
         <div class="actions"><button class="primary" id="processBtn">Process carnival end</button></div>
       </section>
 
       <section class="panel">
-        <h2>Eligible-registrants list (Merkle root)</h2>
+        <h2>Eligible registrants</h2>
         <p class="hint">
-          A faster way to approve a whole list of eligible wallets at once, instead of authorising them
-          one-by-one above. In plain terms: you give it your list of eligible wallet addresses, it
-          boils that list down to one short code (the "root"), and you publish just that code here.
-          Anyone on your original list can then apply automatically — the site checks them against
-          the list for you, with nothing for them to copy or paste.
+          This is the whole eligibility system now — no more authorising wallets one-by-one on-chain.
+          Add or remove wallet addresses below; this page builds the Merkle tree and root for you, right
+          here in the browser. Nobody needs to understand Merkle trees, touch VS Code, or run any script.
         </p>
-        <ol class="hint" style="padding-left:18px; margin:0 0 16px;">
-          <li>On your computer, copy <code>eligible-registrants.example.json</code> to <code>eligible-registrants.json</code> and put your real list of wallet addresses in it.</li>
-          <li>Run <code>npm run generate-merkle-root</code>. It prints a root and writes <code>frontend/generated/eligibility-proofs.json</code>.</li>
-          <li>Commit &amp; push that generated file so it goes live on your site, then paste the printed root below and publish it.</li>
-        </ol>
         <div class="field-row">
+          <div class="field"><label>Add wallet address</label><input id="newEligibleAddr" placeholder="0x..." /></div>
+        </div>
+        <div class="actions"><button class="primary" id="addEligibleBtn">Add to list</button></div>
+
+        <div id="eligibleListWrap" style="margin-top:16px;">
+          <p class="empty-state"><span class="spinner"></span>&nbsp; Loading current list…</p>
+        </div>
+
+        <div class="field-row" style="margin-top:16px;">
           <div class="field">
-            <label>Current root</label>
+            <label>Root published on-chain right now</label>
             <input id="currentRootDisplay" placeholder="—" disabled />
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label>New root (from the script's output)</label>
-            <input id="rootInput" placeholder="0x..." />
+            <label>Root computed from the list above</label>
+            <input id="computedRootDisplay" placeholder="—" disabled />
           </div>
         </div>
-        <div class="actions"><button class="primary" id="setRootBtn">Publish eligibility root</button></div>
+        <p class="hint" id="rootStatusHint"></p>
+
+        <div class="actions">
+          <button class="primary" id="publishRootBtn">Publish root to blockchain</button>
+          <button class="ghost" id="copyListBtn">Copy updated list JSON</button>
+          <button class="ghost" id="downloadListBtn">Download updated list JSON</button>
+        </div>
+
+        <details style="margin-top:14px;">
+          <summary class="hint" style="cursor:pointer;">Why is there still one manual step?</summary>
+          <p class="hint" style="margin-top:8px;">
+            "Publish root to blockchain" is the part that actually matters — it's the one on-chain
+            source of truth, and it's a single click, right here. The list of raw addresses is only
+            used so applicants' browsers can work out <em>their own</em> proof automatically; it has to
+            live somewhere public for that. This project is a static site (no server of its own), so
+            after adding/removing addresses, use "Copy updated list JSON" and paste it over the contents
+            of <code>frontend/generated/eligible-registrants.json</code> using GitHub's own web editor
+            (open the file on github.com, click the pencil icon, paste, commit) — no git, no VS Code,
+            works from a phone. The site redeploys automatically within a minute or two. Applicants who
+            were already eligible aren't affected by this step; it only matters for people you've just
+            added or removed.
+          </p>
+        </details>
       </section>
     </div>
 
@@ -170,6 +182,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/wallet.js"></script>
+<script src="js/merkle.js"></script>
 <script src="js/organiser.js"></script>
 </body>
 </html>

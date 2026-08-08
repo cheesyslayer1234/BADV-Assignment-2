@@ -1,27 +1,30 @@
 /**
  * scripts/generate-merkle-root.js
  *
+ * OPTIONAL. The Organiser Desk (frontend/organiser.html) now does all of
+ * this in the browser via frontend/js/merkle.js — add/remove addresses,
+ * see the root update live, publish it on-chain, and copy the updated
+ * list JSON, no Node or VS Code required. This script is kept around only
+ * as a scriptable CLI alternative (e.g. for bulk-importing a huge list
+ * from a spreadsheet export) and is no longer part of the normal workflow.
+ *
  * Turns a plain list of eligible wallet addresses into:
- *   1. A single Merkle root — paste this into the Organiser Desk's
- *      "Publish eligibility root" box.
- *   2. frontend/generated/eligibility-proofs.json — a lookup table of
- *      one proof per address. apply.html fetches this file itself and
- *      auto-fills the right proof for whichever wallet is connected, so
- *      applicants never see or handle raw proof data.
+ *   1. A single Merkle root — you can paste this straight into the
+ *      contract via a block explorer, or just use the Organiser Desk.
+ *   2. frontend/generated/eligible-registrants.json — the same public
+ *      address list the Organiser Desk manages, so apply.html can look up
+ *      whichever wallet is connected.
  *
  * You do NOT need to understand Merkle trees to use this. All you do is:
  *
  *   1. Copy eligible-registrants.example.json -> eligible-registrants.json
  *      and put your real list of eligible wallet addresses in it.
  *   2. Run:  npm run generate-merkle-root
- *   3. Copy the "Root to publish" value it prints into the Organiser Desk
- *      and click "Publish eligibility root".
- *   4. Commit + push frontend/generated/eligibility-proofs.json (the
+ *   3. Copy the "Root to publish" value it prints and set it via
+ *      `setEligibilityRoot` (e.g. from the Organiser Desk, or a block
+ *      explorer's "write contract" tab).
+ *   4. Commit + push frontend/generated/eligible-registrants.json (the
  *      script just wrote it) so it goes live on GitHub Pages.
- *
- * Re-run this any time the eligible list changes, then re-publish the
- * new root and re-push the new proofs file — old proofs stop working
- * automatically the moment a new root is published on-chain.
  *
  * Leaf convention matches the contract exactly:
  * keccak256(keccak256(abi.encode(address))) — see CarnivalStallManager.sol
@@ -40,7 +43,7 @@ const INPUT_CANDIDATES = [
   path.join(ROOT_DIR, "eligible-registrants.example.json"),
 ];
 const OUTPUT_DIR = path.join(ROOT_DIR, "frontend", "generated");
-const OUTPUT_FILE = path.join(OUTPUT_DIR, "eligibility-proofs.json");
+const OUTPUT_FILE = path.join(OUTPUT_DIR, "eligible-registrants.json");
 
 function hashLeaf(address) {
   const innerHash = ethers.keccak256(
@@ -100,21 +103,14 @@ function main() {
   const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
   const root = tree.getHexRoot();
 
-  const proofsByAddress = {};
-  addresses.forEach((address, i) => {
-    proofsByAddress[address] = tree.getHexProof(leaves[i]);
-  });
-
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   fs.writeFileSync(
     OUTPUT_FILE,
     JSON.stringify(
       {
-        root,
-        generatedAt: new Date().toISOString(),
-        sourceFile: path.relative(ROOT_DIR, inputPath),
-        count: addresses.length,
-        proofsByAddress,
+        "//": "Published, public list of eligible wallet addresses. Edited from the Organiser Desk (organiser.html) — no VS Code or npm script needed. apply.html fetches this file and computes its own Merkle proof client-side against whatever root the Organiser Desk most recently published on-chain.",
+        updatedAt: new Date().toISOString(),
+        addresses,
       },
       null,
       2
@@ -122,9 +118,9 @@ function main() {
   );
 
   console.log(`Read ${addresses.length} eligible address(es) from ${path.relative(ROOT_DIR, inputPath)}.\n`);
-  console.log("Root to publish (paste into Organiser Desk -> Eligible-registrants Merkle root):");
+  console.log("Root to publish (via setEligibilityRoot, e.g. from the Organiser Desk or a block explorer):");
   console.log(`  ${root}\n`);
-  console.log(`Proofs written to: ${path.relative(ROOT_DIR, OUTPUT_FILE)}`);
+  console.log(`Address list written to: ${path.relative(ROOT_DIR, OUTPUT_FILE)}`);
   console.log("Commit and push that file so GitHub Pages serves it, then publish the root above.");
 }
 

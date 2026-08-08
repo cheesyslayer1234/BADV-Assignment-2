@@ -1,0 +1,8 @@
+{
+  "//": "Published, public list of eligible wallet addresses. Edited from the Organiser Desk (organiser.html) — no VS Code or npm script needed. apply.html fetches this file and computes its own Merkle proof client-side against whatever root the Organiser Desk most recently published on-chain.",
+  "updatedAt": "2026-08-08T08:02:30.739Z",
+  "addresses": [
+    "0x803CEbC480517BB04446Ae9abb6C7FA591380a5b",
+    "0x313A25D8d65f0b6427D6c5381c96B4260642aD79"
+  ]
+}

@@ -1,25 +1,28 @@
 /**
  * apply.js — page logic for apply.html (Apply for a Stall).
- * Requires wallet.js to be loaded first.
+ * Requires wallet.js and merkle.js to be loaded first.
  *
  * Eligibility check flow — entirely automatic, applicant never sees or
  * touches raw proof data:
- *   1. Ask the contract if this wallet is on the organiser's whitelist.
- *   2. If not, fetch frontend/generated/eligibility-proofs.json (written
- *      by `npm run generate-merkle-root`) and see if it has a proof for
- *      this wallet. If so, ask the contract to confirm that proof is
- *      actually valid against the published root.
- *   3. If neither path works, tell the applicant plainly they're not on
- *      the list yet. If the check itself couldn't even run (e.g. the
- *      eligibility file was unreachable), say so and offer a retry —
- *      never fall back to a manual paste box.
+ *   1. Fetch frontend/generated/eligible-registrants.json — the plain,
+ *      public list of eligible addresses the organiser maintains from the
+ *      Organiser Desk.
+ *   2. Build the Merkle tree client-side (merkle.js) and, if this wallet
+ *      is in the list, compute its proof.
+ *   3. Ask the contract to confirm that proof actually verifies against
+ *      whatever root is currently published on-chain (guards against the
+ *      list having gone stale since the organiser last published).
+ *   4. If any of that fails to turn up a valid proof, tell the applicant
+ *      plainly they're not on the list yet. If the check itself couldn't
+ *      even run (e.g. the list file was unreachable), say so and offer a
+ *      retry — never fall back to a manual paste box.
  *
  * currentProof holds whatever proof (if any) was auto-detected for the
  * connected wallet, and is what actually gets submitted with the
  * application — the applicant only ever fills in the stall name.
  */
 
-let currentProof = []; // [] = registering via whitelist, non-empty = via Merkle proof
+let currentProof = [];
 
 document.addEventListener('wallet:ready', ()=>{
   checkEligibility();
@@ -65,31 +68,24 @@ async function checkEligibility(){
   resetEligibilityBanners();
   currentProof = [];
 
-  let whitelisted = false;
   try{
-    whitelisted = await contract.isAuthorisedRegistrant(userAddress);
-  }catch(err){
-    // couldn't even reach the chain for this read — treat as a soft
-    // failure and still try the proof-file path below before giving up.
-  }
-  if(whitelisted){
-    showEligible();
-    return;
-  }
-
-  try{
-    const res = await fetch('generated/eligibility-proofs.json');
+    const res = await fetch('generated/eligible-registrants.json');
     if(!res.ok){ showCouldNotCheck(); return; }
     const data = await res.json();
-    const proof = data.proofsByAddress && data.proofsByAddress[ethers.getAddress(userAddress)];
+    const addresses = Array.isArray(data) ? data : data.addresses;
+    if(!Array.isArray(addresses)){ showCouldNotCheck(); return; }
+
+    const tree = Merkle.buildTree(addresses);
+    const proof = Merkle.getProof(tree, userAddress);
     if(!proof){ showNotEligible(); return; }
+
     const validOnChain = await contract.isEligibleByProof(userAddress, proof);
     if(validOnChain){
       currentProof = proof;
       showEligible();
     }else{
-      // File is stale (organiser published a newer root since) — this
-      // wallet just isn't on the current list.
+      // List is stale (organiser published a newer root since this file
+      // was last updated) — this wallet just isn't on the current list.
       showNotEligible();
     }
   }catch(err){

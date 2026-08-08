@@ -17,8 +17,8 @@ test/
   CarnivalStallManager.test.js  # 42-case Hardhat/Chai unit test suite
 scripts/
   deploy.js                  # local/testnet deployment script
-  generate-merkle-root.js    # builds the eligibility root + per-wallet proofs file
-eligible-registrants.example.json  # copy to eligible-registrants.json with your real list
+  generate-merkle-root.js    # optional CLI alternative to the in-browser tool;
+                              # not needed for day-to-day use anymore
 frontend/
   index.html, apply.html,
   browse.html, manage.html,
@@ -26,9 +26,11 @@ frontend/
   css/styles.css             # shared styling
   js/config.js               # deployed contract address (auto-written by scripts/deploy.js)
   js/wallet.js               # shared wallet connect + contract config
+  js/merkle.js                # client-side Merkle tree (build root, compute proofs — no Node needed)
   js/apply.js, browse.js,
   js/manage.js, organiser.js # page-specific logic
-  generated/eligibility-proofs.json  # written by generate-merkle-root.js, committed (not gitignored)
+  generated/eligible-registrants.json  # public list of eligible wallets, edited from
+                              # the Organiser Desk; committed (not gitignored)
 .github/workflows/ci.yml     # CI/CD pipeline: compile + test + coverage on every push,
                               # then auto-deploy to Sepolia and publish frontend/ to
                               # GitHub Pages on push to main (see CD-SETUP.md)
@@ -60,11 +62,10 @@ The deploy script automatically writes the deployed address into
 ## Core requirements implemented
 
 1. **Stall registration (application)** — `registerStall(name, merkleProof)`.
-   The caller must be eligible either via the organiser's
-   `addAuthorisedRegistrant` whitelist, or by submitting a valid Merkle
-   proof against the published `eligibleRegistrantsRoot` (see Additional
-   Feature 1 below). Registering creates a `Pending` application, not an
-   active stall: a whitelisted or eligible wallet can *apply*, but the
+   The caller must submit a valid Merkle proof against the published
+   `eligibleRegistrantsRoot` (see Additional Feature 1 below). Registering
+   creates a `Pending` application, not an active stall: an eligible wallet
+   can *apply*, but the
    organiser must separately call `approveStall`/`rejectStall` before it
    can accept payments. Both decisions are stamped with a `decidedAt`
    timestamp on top of the `appliedAt` timestamp recorded at submission,
@@ -93,26 +94,30 @@ The deploy script automatically writes the deployed address into
    by submitting a Merkle proof; the contract recomputes the path with
    `MerkleProof.verify` (OpenZeppelin) and checks it resolves to the
    published root — without ever storing the full address list on-chain.
-   This sits *alongside* the existing `authorisedRegistrants` whitelist as
-   a second, cheaper eligibility path (`registerStall` accepts either).
-   Leaves use the standard double-hash convention
-   (`keccak256(keccak256(abi.encode(address)))`) to guard against
-   second-preimage attacks on the tree.
+   This is the *only* eligibility path — there's no separate on-chain
+   whitelist to keep in sync with it. Leaves use the standard double-hash
+   convention (`keccak256(keccak256(abi.encode(address)))`) to guard
+   against second-preimage attacks on the tree.
 
-   **Organiser workflow** (no crypto background needed):
-   1. Copy `eligible-registrants.example.json` to `eligible-registrants.json`
-      and put your real list of eligible wallet addresses in it.
-   2. Run `npm run generate-merkle-root`. It prints the root to publish and
-      writes `frontend/generated/eligibility-proofs.json`.
-   3. Commit and push that generated file (it's intentionally **not**
-      gitignored — Pages has to serve it), then paste the printed root into
-      the Organiser Desk's "Eligible-registrants list" panel and publish it.
+   **Organiser workflow** (no crypto background, no Node, no VS Code
+   needed): everything happens on the Organiser Desk (`organiser.html`)
+   in the browser, via `frontend/js/merkle.js`.
+   1. Add or remove wallet addresses in the "Eligible registrants" panel.
+      The page builds the Merkle tree and root for you live, as you type.
+   2. Click "Publish root to blockchain" — one MetaMask transaction, done.
+   3. Click "Copy updated list JSON" and paste it over the contents of
+      `frontend/generated/eligible-registrants.json` using GitHub's own
+      web file editor (no git needed, works from a phone). This step only
+      matters for people who were just added or removed — everyone
+      already on the list is unaffected — and it's what lets applicants'
+      browsers work out their own proof (see below).
 
-   From there it's invisible to applicants: `apply.html` fetches that file
-   itself and fills in the right proof for whichever wallet is connected,
-   so nobody ever sees or pastes raw proof data. Re-run the script and
-   repeat step 3 any time the eligible list changes — publishing a new root
-   automatically invalidates old proofs.
+   From there it's invisible to applicants: `apply.html` fetches that
+   published list itself and computes the right proof for whichever
+   wallet is connected, using the same `merkle.js` helper, so nobody ever
+   sees or pastes raw proof data. `scripts/generate-merkle-root.js` still
+   exists as an optional Node CLI alternative (e.g. for scripting bulk
+   imports), but it's no longer part of the day-to-day workflow.
 2. **CI/CD pipeline + unit test suite** — a Hardhat/Chai test suite
    covering every core requirement plus the Merkle-proof feature, backed by
    GitHub Actions (`.github/workflows/ci.yml`), which runs `hardhat compile`

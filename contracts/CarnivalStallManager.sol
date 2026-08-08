@@ -14,7 +14,6 @@ contract CarnivalStallManager {
     error NothingToWithdraw();
     error InsufficientStallBalance(uint256 available, uint256 requested);
     error InsufficientPayerCredit(uint256 available, uint256 requested);
-    error ZeroAddress();
     error ZeroAmount();
     error EmptyStallName();
     error AlreadyProcessed();
@@ -24,9 +23,6 @@ contract CarnivalStallManager {
     error StallNotApproved(uint256 stallId);
 
     address public organiser;
-
-    // Whitelist path: organiser explicitly authorises an address.
-    mapping(address => bool) private authorisedRegistrants;
 
     // Merkle-proof path: organiser publishes one root representing the full
     // set of eligible TP students/staff. Anyone in that set can register by
@@ -65,8 +61,6 @@ contract CarnivalStallManager {
 
     mapping(uint256 => mapping(address => bool)) private hasPaidStall;
 
-    event RegistrantAuthorised(address indexed account);
-    event RegistrantRevoked(address indexed account);
     event EligibilityRootUpdated(bytes32 newRoot);
     event StallApplicationSubmitted(uint256 indexed stallId, address indexed applicant, string name, uint256 timestamp);
     event StallApproved(uint256 indexed stallId, address indexed organiser, uint256 timestamp);
@@ -108,23 +102,6 @@ contract CarnivalStallManager {
     constructor(uint256 _carnivalEndTime) {
         organiser = msg.sender;
         carnivalEndTime = _carnivalEndTime;
-        authorisedRegistrants[msg.sender] = true;
-        emit RegistrantAuthorised(msg.sender);
-    }
-
-    function addAuthorisedRegistrant(address account) external onlyOrganiser {
-        if (account == address(0)) revert ZeroAddress();
-        authorisedRegistrants[account] = true;
-        emit RegistrantAuthorised(account);
-    }
-
-    function removeAuthorisedRegistrant(address account) external onlyOrganiser {
-        authorisedRegistrants[account] = false;
-        emit RegistrantRevoked(account);
-    }
-
-    function isAuthorisedRegistrant(address account) external view returns (bool) {
-        return authorisedRegistrants[account];
     }
 
     /// @notice Organiser publishes/updates the Merkle root of eligible
@@ -151,15 +128,14 @@ contract CarnivalStallManager {
         return MerkleProof.verify(merkleProof, eligibleRegistrantsRoot, leaf);
     }
 
-    /// @notice Registers a stall application. The caller must either be on
-    /// the organiser-maintained whitelist, or supply a valid Merkle proof
-    /// that they belong to the published eligible-registrants set. Pass an
-    /// empty array for `merkleProof` if registering via the whitelist path.
+    /// @notice Registers a stall application. The caller must supply a
+    /// valid Merkle proof that they belong to the published
+    /// eligible-registrants set.
     function registerStall(string calldata name, bytes32[] calldata merkleProof)
         external
         returns (uint256 stallId)
     {
-        if (!authorisedRegistrants[msg.sender] && !isEligibleByProof(msg.sender, merkleProof)) {
+        if (!isEligibleByProof(msg.sender, merkleProof)) {
             revert NotEligibleToRegister();
         }
         if (bytes(name).length == 0) revert EmptyStallName();
