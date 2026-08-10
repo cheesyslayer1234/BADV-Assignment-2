@@ -165,7 +165,19 @@ function friendlyError(err){
   
   
   
-  const decoded = err && (err.revert || err.info?.error?.data ? err.revert : undefined);
+  // Ethers v6 attaches a decoded `.revert` (name + args) when it can match
+  // the returned data against the contract's ABI. That's not always
+  // populated though (e.g. some RPC error shapes only carry raw revert
+  // bytes in `.data` / `.info.error.data`), so fall back to decoding that
+  // ourselves with the contract's interface before giving up.
+  let decoded = err && err.revert;
+  if(!decoded){
+    const rawData = err?.data || err?.info?.error?.data;
+    if(rawData && contract?.interface){
+      try{ decoded = contract.interface.parseError(rawData); }
+      catch(_e){  }
+    }
+  }
   if(decoded && decoded.name && CUSTOM_ERROR_MESSAGES[decoded.name]){
     try{ return CUSTOM_ERROR_MESSAGES[decoded.name](decoded.args); }
     catch(_e){  }
@@ -184,6 +196,9 @@ function friendlyError(err){
     if(bareName && CUSTOM_ERROR_MESSAGES[bareName[1]]){
       try{ return CUSTOM_ERROR_MESSAGES[bareName[1]](); }catch(_e){ /* ignore */ }
     }
+    // Ethers' own "couldn't figure out what this revert was" wording is
+    // not something a user should ever see - treat it like no reason at all.
+    if(/unknown custom error|could not decode/i.test(reason)) reason = null;
     // Guard against ethers still handing back something huge/JSON-ish.
     if(reason && reason.length <= 160 && !/^\{|^\[/.test(reason)) return reason;
   }

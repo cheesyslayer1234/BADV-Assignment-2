@@ -109,7 +109,18 @@ async function loadStalls(){
     const decided = [];
     for(let i=0; i<Number(count); i++){
       const raw = await contract.getStall(i);
-      const s = { id: i, ...raw };
+      const s = {
+        id: i,
+        owner: raw.owner,
+        name: raw.name,
+        balance: raw.balance,
+        withdrawn: raw.withdrawn,
+        totalPaid: raw.totalPaid,
+        status: raw.status,
+        appliedAt: raw.appliedAt,
+        decidedAt: raw.decidedAt,
+        rejectionReason: raw.rejectionReason,
+      };
       if(Number(s.status) === 1) pending.push(s);
       else decided.push(s);
     }
