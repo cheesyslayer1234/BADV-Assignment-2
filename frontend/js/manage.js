@@ -44,7 +44,20 @@ async function findMyStalls(){
   for(let i=0; i<Number(count); i++){
     const s = await contract.getStall(i);
     if(s.owner.toLowerCase() === userAddress.toLowerCase()){
-      mine.push({ id: i, ...s });
+      // NOTE: `s` is an ethers v6 Result — spreading it only copies numeric
+      // indices, not named fields. Map fields explicitly (see apply.js).
+      mine.push({
+        id: i,
+        owner: s.owner,
+        name: s.name,
+        balance: s.balance,
+        withdrawn: s.withdrawn,
+        totalPaid: s.totalPaid,
+        status: s.status,
+        appliedAt: s.appliedAt,
+        decidedAt: s.decidedAt,
+        rejectionReason: s.rejectionReason
+      });
     }
   }
   return mine;

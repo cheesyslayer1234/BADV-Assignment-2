@@ -22,12 +22,29 @@ async function loadMyApplications(){
   list.innerHTML = '<p class="empty-state"><span class="spinner"></span>&nbsp; Loading…</p>';
   try{
     const count = await contract.stallCount();
-    const statusNames = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
-    const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
+    const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
+    const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
     const mine = [];
     for(let i=0; i<Number(count); i++){
       const s = await contract.getStall(i);
-      if(s.owner.toLowerCase() === userAddress.toLowerCase()) mine.push({ id: i, ...s });
+      if(s.owner.toLowerCase() === userAddress.toLowerCase()){
+        // NOTE: `s` is an ethers v6 Result (array-like with named getters).
+        // `{ id: i, ...s }` only copies the numeric indices, not the named
+        // fields (name, status, etc.) — so they'd end up undefined here.
+        // Map fields explicitly instead.
+        mine.push({
+          id: i,
+          owner: s.owner,
+          name: s.name,
+          balance: s.balance,
+          withdrawn: s.withdrawn,
+          totalPaid: s.totalPaid,
+          status: s.status,
+          appliedAt: s.appliedAt,
+          decidedAt: s.decidedAt,
+          rejectionReason: s.rejectionReason
+        });
+      }
     }
     list.innerHTML = '';
     if(mine.length === 0){
@@ -45,8 +62,7 @@ async function loadMyApplications(){
         <p class="hint">${
           status===1 ? 'Awaiting organiser approval.' :
           status===2 ? 'Approved — visible on the Browse & Pay page.' :
-          status===3 ? `Rejected — reason: ${s.rejectionReason}. Head to My Stall Tools to edit and resubmit.` :
-          status===4 ? 'You cancelled this stall.' : ''
+          status===3 ? `Rejected — reason: ${s.rejectionReason}. Head to My Stall Tools to edit and resubmit.` : ''
         }</p>
       `;
       list.appendChild(card);

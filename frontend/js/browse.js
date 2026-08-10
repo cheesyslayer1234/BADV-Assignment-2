@@ -16,17 +16,21 @@ async function loadStalls(){
   try{
     const count = await contract.stallCount();
     grid.innerHTML = '';
+    let shown = 0;
     for(let i=0; i<Number(count); i++){
       const s = await contract.getStall(i);
 
-      const statusNames = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
-      const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
+      const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
+      const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
       const status = Number(s.status);
       const isApproved = status === 2;
 
-      let disabledHint = 'This application was rejected and cannot accept payments.';
-      if(status === 1) disabledHint = 'Awaiting organiser approval — payments are disabled until then.';
-      else if(status === 4) disabledHint = 'This stall was cancelled by its owner and cannot accept payments.';
+      // Pending applications aren't public yet — only the applicant (via
+      // "Your applications") and the organiser should see them.
+      if(status === 1) continue;
+      shown++;
+
+      const disabledHint = 'This application was rejected and cannot accept payments.';
 
       const card = document.createElement('div');
       card.className = 'stall-card';
@@ -60,8 +64,8 @@ async function loadStalls(){
 
       grid.appendChild(card);
     }
-    if(Number(count)===0){
-      grid.innerHTML = '<p class="empty-state">No stalls registered yet.</p>';
+    if(shown === 0){
+      grid.innerHTML = '<p class="empty-state">No stalls available yet.</p>';
     }
   }catch(err){
     grid.innerHTML = '<p class="empty-state">Could not load stalls.</p>';
