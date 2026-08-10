@@ -1,15 +1,3 @@
-/**
- * organiser.js — page logic for organiser.html (Organiser Desk).
- * Requires wallet.js to be loaded first.
- *
- * Anyone can open this page. What they see depends on their wallet:
- *   - no wallet connected      -> "connect your wallet" gate
- *   - connected, not organiser -> inline "sorry, not the organiser" message
- *   - connected, is organiser  -> the actual admin tools
- *
- * Pending/decided stalls are fetched from the contract and rendered as
- * clickable cards, so the organiser never has to know or type a stall ID.
- */
 
 const STATUS_NAMES = ['None', 'Pending', 'Approved', 'Rejected'];
 const STATUS_CLASSES = ['', 'status-pending', 'status-approved', 'status-rejected'];
@@ -68,7 +56,7 @@ function renderPendingCard(s){
       const tx = await contract.approveStall(s.id);
       log(`Approving stall #${s.id} ("${s.name}")…`);
       await tx.wait();
-      log('Stall approved — it can now accept payments.', 'ok');
+      log('Stall approved - it can now accept payments.', 'ok');
       loadStalls();
     }catch(err){
       log('Approval failed: ' + friendlyError(err), 'err');
@@ -99,7 +87,7 @@ function renderDecidedCard(s){
   card.className = 'stall-card';
   let statusLine;
   if(status === 2) statusLine = `Approved ${formatWhen(s.decidedAt)}`;
-  else if(status === 3) statusLine = `Rejected ${formatWhen(s.decidedAt)} — reason: ${s.rejectionReason}`;
+  else if(status === 3) statusLine = `Rejected ${formatWhen(s.decidedAt)} - reason: ${s.rejectionReason}`;
   else statusLine = '';
   card.innerHTML = `
     <div class="id-tag">STALL #${s.id}</div>
@@ -114,7 +102,7 @@ function renderDecidedCard(s){
 async function loadStalls(){
   const pendingList = document.getElementById('pendingList');
   const decidedList = document.getElementById('decidedList');
-  pendingList.innerHTML = '<p class="empty-state"><span class="spinner"></span>&nbsp; Loading applications…</p>';
+  pendingList.innerHTML = emptyState(MESSAGES.loadingApplications, { spinner: true });
   try{
     const count = await contract.stallCount();
     const pending = [];
@@ -128,14 +116,14 @@ async function loadStalls(){
 
     pendingList.innerHTML = '';
     if(pending.length === 0){
-      pendingList.innerHTML = '<p class="empty-state">No pending applications right now.</p>';
+      pendingList.innerHTML = emptyState(MESSAGES.noPendingApplications);
     }else{
       pending.forEach(s=> pendingList.appendChild(renderPendingCard(s)));
     }
 
     decidedList.innerHTML = '';
     if(decided.length === 0){
-      decidedList.innerHTML = '<p class="empty-state">No decided stalls yet.</p>';
+      decidedList.innerHTML = emptyState(MESSAGES.noDecidedStalls);
     }else{
       const grid = document.createElement('div');
       grid.className = 'stall-grid';
@@ -143,7 +131,7 @@ async function loadStalls(){
       decidedList.appendChild(grid);
     }
   }catch(err){
-    pendingList.innerHTML = '<p class="empty-state">Could not load applications.</p>';
+    pendingList.innerHTML = emptyState(MESSAGES.couldNotLoadApplications);
     log('Could not load stalls: ' + friendlyError(err), 'err');
   }
 }
@@ -164,5 +152,4 @@ document.getElementById('processBtn').addEventListener('click', async ()=>{
     log('Carnival processed. Withdrawals open 24h from now.', 'ok');
   }catch(err){ log('Failed: ' + friendlyError(err), 'err'); }
 });
-
 

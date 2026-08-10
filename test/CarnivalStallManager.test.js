@@ -11,7 +11,7 @@ describe("CarnivalStallManager", function () {
     [organiser, student, staff, buyer1, buyer2, stranger] =
       await ethers.getSigners();
 
-    carnivalEndTime = (await time.latest()) + 24 * 60 * 60; // +1 day
+    carnivalEndTime = (await time.latest()) + 24 * 60 * 60; 
 
     const Factory = await ethers.getContractFactory("CarnivalStallManager");
     contract = await Factory.deploy(carnivalEndTime);
@@ -41,7 +41,7 @@ describe("CarnivalStallManager", function () {
       const stall = await contract.getStall(0);
       expect(stall.owner).to.equal(student.address);
       expect(stall.name).to.equal("Bubble Tea");
-      expect(stall.status).to.equal(1); // Pending
+      expect(stall.status).to.equal(1); 
       expect(stall.appliedAt).to.be.gt(0);
       expect(stall.decidedAt).to.equal(0);
     });
@@ -65,6 +65,54 @@ describe("CarnivalStallManager", function () {
     });
   });
 
+  describe("Additional Feature 2: One pending application per applicant", function () {
+    it("blocks a second application while the first is still pending", async function () {
+      await contract.connect(student).registerStall("Stall A");
+      await expect(contract.connect(student).registerStall("Stall B"))
+        .to.be.revertedWithCustomError(contract, "ApplicantHasPendingApplication")
+        .withArgs(student.address, 0);
+    });
+
+    it("does not block a different applicant", async function () {
+      await contract.connect(student).registerStall("Stall A");
+      await expect(contract.connect(staff).registerStall("Stall B")).to.not.be.reverted;
+    });
+
+    it("reports pending status via getPendingApplication", async function () {
+      await contract.connect(student).registerStall("Stall A");
+      const [hasPending, stallId] = await contract.getPendingApplication(student.address);
+      expect(hasPending).to.equal(true);
+      expect(stallId).to.equal(0);
+    });
+
+    it("allows a new application once the pending one is approved", async function () {
+      await contract.connect(student).registerStall("Stall A");
+      await contract.approveStall(0);
+      let [hasPending] = await contract.getPendingApplication(student.address);
+      expect(hasPending).to.equal(false);
+      await expect(contract.connect(student).registerStall("Stall B")).to.not.be.reverted;
+    });
+
+    it("allows a new application once the pending one is rejected", async function () {
+      await contract.connect(student).registerStall("Stall A");
+      await contract.rejectStall(0, "No permit");
+      let [hasPending] = await contract.getPendingApplication(student.address);
+      expect(hasPending).to.equal(false);
+      await expect(contract.connect(student).registerStall("Stall B")).to.not.be.reverted;
+    });
+
+    it("re-flags as pending after a rejected application is resubmitted", async function () {
+      await contract.connect(student).registerStall("Stall A");
+      await contract.rejectStall(0, "No permit");
+      await contract.connect(student).resubmitStall(0, "Stall A v2");
+      const [hasPending, stallId] = await contract.getPendingApplication(student.address);
+      expect(hasPending).to.equal(true);
+      expect(stallId).to.equal(0);
+      await expect(contract.connect(student).registerStall("Stall B"))
+        .to.be.revertedWithCustomError(contract, "ApplicantHasPendingApplication");
+    });
+  });
+
   describe("Requirement 1b: Organiser approval workflow", function () {
     beforeEach(async function () {
       await contract.connect(student).registerStall("Waffle Wonderland");
@@ -72,7 +120,7 @@ describe("CarnivalStallManager", function () {
 
     it("starts a new application in Pending status", async function () {
       const stall = await contract.getStall(0);
-      expect(stall.status).to.equal(1); // Pending
+      expect(stall.status).to.equal(1); 
     });
 
     it("blocks payments to a stall that hasn't been approved yet", async function () {
@@ -87,7 +135,7 @@ describe("CarnivalStallManager", function () {
         .withArgs(0, organiser.address, anyValue);
 
       const stall = await contract.getStall(0);
-      expect(stall.status).to.equal(2); // Approved
+      expect(stall.status).to.equal(2); 
       expect(stall.decidedAt).to.be.gt(0);
     });
 
@@ -104,7 +152,7 @@ describe("CarnivalStallManager", function () {
         .withArgs(0, organiser.address, "Missing food safety cert", anyValue);
 
       const stall = await contract.getStall(0);
-      expect(stall.status).to.equal(3); // Rejected
+      expect(stall.status).to.equal(3); 
       expect(stall.rejectionReason).to.equal("Missing food safety cert");
     });
 
@@ -164,7 +212,7 @@ describe("CarnivalStallManager", function () {
         .withArgs(0, student.address, anyValue);
 
       const stall = await contract.getStall(0);
-      expect(stall.status).to.equal(1); // Pending
+      expect(stall.status).to.equal(1); 
       expect(stall.name).to.equal("Waffle Wonderland v2");
       expect(stall.rejectionReason).to.equal("");
     });
@@ -189,7 +237,7 @@ describe("CarnivalStallManager", function () {
       await expect(contract.connect(organiser).approveStall(0))
         .to.emit(contract, "StallApproved");
       const stall = await contract.getStall(0);
-      expect(stall.status).to.equal(2); // Approved
+      expect(stall.status).to.equal(2); 
     });
   });
 
@@ -264,8 +312,8 @@ describe("CarnivalStallManager", function () {
     });
 
     it("cannot refund one payer using another payer's contribution", async function () {
-      // buyer2 never paid, so their credit is zero even though the stall
-      // balance (from buyer1) is nonzero.
+      
+      
       await expect(
         contract
           .connect(student)

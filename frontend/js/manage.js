@@ -1,15 +1,3 @@
-/**
- * manage.js — page logic for manage.html (My Stall Tools).
- * Requires wallet.js to be loaded first.
- *
- * Anyone can open this page. What they see depends on their wallet:
- *   - no wallet connected        -> "connect your wallet" gate
- *   - connected, owns no stall   -> inline "you don't own a stall" message
- *   - connected, owns a stall    -> refund/withdraw controls on each stall's own card
- *
- * Refund and withdraw actions live directly on each stall's card, bound
- * to that stall's ID via closure — nobody has to know or type a stall ID.
- */
 
 function showState(id){
   ['checkingState','noWalletState','notOwnerState','ownerTools'].forEach(s=>{
@@ -44,8 +32,8 @@ async function findMyStalls(){
   for(let i=0; i<Number(count); i++){
     const s = await contract.getStall(i);
     if(s.owner.toLowerCase() === userAddress.toLowerCase()){
-      // NOTE: `s` is an ethers v6 Result — spreading it only copies numeric
-      // indices, not named fields. Map fields explicitly (see apply.js).
+      
+      
       mine.push({
         id: i,
         owner: s.owner,
@@ -78,7 +66,7 @@ async function renderMyStalls(myStalls){
     card.className = 'stall-card';
 
     let actionsHtml = '';
-    if(status === 2){ // Approved — only approved stalls can hold/refund/withdraw balance
+    if(status === 2){ // Approved - only approved stalls can hold/refund/withdraw balance
       const canWithdraw = withdrawalWindowOpen && Number(s.balance) > 0 && !s.withdrawn;
       actionsHtml = `
         <div class="stall-actions">
@@ -95,7 +83,7 @@ async function renderMyStalls(myStalls){
              Number(s.balance) === 0 ? '<p class="hint">Nothing to withdraw yet.</p>' : '')}
         </div>
       `;
-    } else if(status === 3){ // Rejected — owner can edit and resubmit
+    } else if(status === 3){ // Rejected - owner can edit and resubmit
       actionsHtml = `
         <div class="stall-actions">
           <div class="field"><label>Updated stall name</label><input class="resubmit-name" value="${s.name}" /></div>
@@ -113,7 +101,7 @@ async function renderMyStalls(myStalls){
       <div class="meta"><span>Balance</span><b>${ethers.formatEther(s.balance)} ETH</b></div>
       <div class="meta"><span>Total received</span><b>${ethers.formatEther(s.totalPaid)} ETH</b></div>
       ${status===1 ? '<p class="hint">Awaiting organiser approval.</p>' : ''}
-      ${status===3 ? `<p class="hint">Rejected — reason: ${s.rejectionReason}</p>` : ''}
+      ${status===3 ? `<p class="hint">Rejected - reason: ${s.rejectionReason}</p>` : ''}
       ${actionsHtml}
     `;
 
@@ -127,7 +115,7 @@ async function renderMyStalls(myStalls){
           log(`Refunding ${amount} ETH to ${payer.slice(0,8)}… from stall #${s.id}`);
           await tx.wait();
           log('Refund sent.', 'ok');
-          document.dispatchEvent(new CustomEvent('wallet:ready')); // cheap way to re-fetch balances
+          document.dispatchEvent(new CustomEvent('wallet:ready')); 
         }catch(err){ log('Refund failed: ' + friendlyError(err), 'err'); }
       });
 
@@ -156,7 +144,7 @@ async function renderMyStalls(myStalls){
           const tx = await contract.resubmitStall(s.id, newName);
           log(`Resubmitting stall #${s.id}…`);
           await tx.wait();
-          log('Application resubmitted — awaiting organiser review.', 'ok');
+          log('Application resubmitted - awaiting organiser review.', 'ok');
           document.dispatchEvent(new CustomEvent('wallet:ready'));
         }catch(err){
           log('Resubmission failed: ' + friendlyError(err), 'err');

@@ -1,18 +1,13 @@
-/**
- * browse.js — page logic for browse.html (Browse & Pay Stalls).
- * Requires wallet.js to be loaded first.
- */
 
 document.addEventListener('wallet:ready', loadStalls);
 document.addEventListener('wallet:disconnected', ()=>{
-  document.getElementById('stallGrid').innerHTML =
-    '<p class="empty-state">Connect your wallet to load stalls.</p>';
+  document.getElementById('stallGrid').innerHTML = emptyState(MESSAGES.connectToLoadStalls);
 });
 
 async function loadStalls(){
   if(!contract) return;
   const grid = document.getElementById('stallGrid');
-  grid.innerHTML = '<p class="empty-state"><span class="spinner"></span>&nbsp; Loading stalls…</p>';
+  grid.innerHTML = emptyState(MESSAGES.loadingStalls, { spinner: true });
   try{
     const count = await contract.stallCount();
     grid.innerHTML = '';
@@ -25,8 +20,8 @@ async function loadStalls(){
       const status = Number(s.status);
       const isApproved = status === 2;
 
-      // Pending applications aren't public yet — only the applicant (via
-      // "Your applications") and the organiser should see them.
+      
+      
       if(status === 1) continue;
       shown++;
 
@@ -65,10 +60,10 @@ async function loadStalls(){
       grid.appendChild(card);
     }
     if(shown === 0){
-      grid.innerHTML = '<p class="empty-state">No stalls available yet.</p>';
+      grid.innerHTML = emptyState(MESSAGES.noStalls);
     }
   }catch(err){
-    grid.innerHTML = '<p class="empty-state">Could not load stalls.</p>';
+    grid.innerHTML = emptyState(MESSAGES.couldNotLoadStalls);
     log('Could not load stalls: ' + friendlyError(err), 'err');
   }
 }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Organiser Desk — CCN Hub</title>
+<title>Organiser Desk - CCN Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/styles.css" />
@@ -46,25 +46,23 @@
       <a href="organiser.html" class="active"><span>Organiser Desk</span><small>Approvals, close-out</small></a>
     </nav>
     <div class="drawer-foot">
-      CONTRACT <span id="drawerContractAddr">—</span><br />
-      NETWORK <span id="networkName">—</span>
+      CONTRACT <span id="drawerContractAddr">-</span><br />
+      NETWORK <span id="networkName">-</span>
     </div>
   </aside>
 
-  <div class="wrap" style="padding-top:32px;">
+  <main class="wrap page-main" style="padding-top:32px;">
 
     <section class="panel subtle" style="margin-top:0;">
       <h2>Organiser Desk</h2>
       <p class="hint">Restricted to the wallet that deployed the contract.</p>
     </section>
 
-    <!-- Shown while we don't yet know who's connected -->
-    <section class="panel" id="checkingState">
+        <section class="panel" id="checkingState">
       <div class="empty-state"><span class="spinner"></span>&nbsp; Checking wallet…</div>
     </section>
 
-    <!-- Shown if no wallet connected at all -->
-    <section class="panel" id="noWalletState" style="display:none;">
+        <section class="panel" id="noWalletState" style="display:none;">
       <div class="gate">
         <div class="badge"><i data-lucide="lock"></i></div>
         <h2>Connect your wallet</h2>
@@ -73,25 +71,23 @@
       </div>
     </section>
 
-    <!-- Shown if connected wallet isn't the organiser -->
-    <section class="panel" id="notOrganiserState" style="display:none;">
+        <section class="panel" id="notOrganiserState" style="display:none;">
       <div class="gate">
         <div class="badge"><i data-lucide="shield-alert"></i></div>
         <h2>Sorry, but you are not the organiser</h2>
         <p>This wallet doesn't match the address that deployed the contract, so it can't approve stalls or close out the carnival.</p>
-        <div class="addr" id="connectedAddrDisplay">—</div>
+        <div class="addr" id="connectedAddrDisplay">-</div>
       </div>
     </section>
 
-    <!-- Organiser tools -->
-    <div id="organiserTools" style="display:none;">
+        <div id="organiserTools" style="display:none;">
 
       <section class="panel">
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-          <h2 style="margin:0;">Pending applications</h2>
+        <div class="panel-toolbar">
+          <h2>Pending applications</h2>
           <button class="ghost" id="refreshStallsBtn">Refresh</button>
         </div>
-        <p class="hint">New stall applications — including resubmitted ones — land here. Approve turns one into a live stall that can accept payments; rejecting requires a reason and lets the owner fix and resubmit. No need to know or type a stall ID, just click the one you want.</p>
+        <p class="hint">New stall applications - including resubmitted ones - land here. Approve turns one into a live stall that can accept payments; rejecting requires a reason and lets the owner fix and resubmit. No need to know or type a stall ID, just click the one you want.</p>
         <div id="pendingList"><p class="empty-state"><span class="spinner"></span>&nbsp; Loading applications…</p></div>
       </section>
 
@@ -110,9 +106,9 @@
 
     </div>
 
-  </div>
+  </main>
 
-  <footer class="site-footer">CCN Hub — Powering CCN Day</footer>
+  <footer class="site-footer">CCN Hub - Powering CCN Day</footer>
 
 <script src="js/config.js"></script>
 <script src="js/wallet.js"></script>

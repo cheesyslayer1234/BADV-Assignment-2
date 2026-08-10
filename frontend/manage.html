@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>My Stall Tools — CCN Hub</title>
+<title>My Stall Tools - CCN Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/styles.css" />
@@ -46,25 +46,23 @@
       <a href="organiser.html"><span>Organiser Desk</span><small>Approvals, close-out</small></a>
     </nav>
     <div class="drawer-foot">
-      CONTRACT <span id="drawerContractAddr">—</span><br />
-      NETWORK <span id="networkName">—</span>
+      CONTRACT <span id="drawerContractAddr">-</span><br />
+      NETWORK <span id="networkName">-</span>
     </div>
   </aside>
 
-  <div class="wrap" style="padding-top:32px;">
+  <main class="wrap page-main" style="padding-top:32px;">
 
     <section class="panel subtle" style="margin-top:0;">
       <h2>My Stall Tools</h2>
-      <p class="hint">For stall owners only.</p>
+      <p class="hint">For stall owners only. Once your stall is approved, this is where you process buyer refunds, withdraw your stall's earnings after CCN Day wraps up, and keep an eye on your stall's on-chain balance, all without needing to remember a stall ID or wallet address.</p>
     </section>
 
-    <!-- Shown while we don't yet know who's connected -->
-    <section class="panel" id="checkingState">
+        <section class="panel" id="checkingState">
       <div class="empty-state"><span class="spinner"></span>&nbsp; Checking wallet…</div>
     </section>
 
-    <!-- Shown if no wallet connected at all -->
-    <section class="panel" id="noWalletState" style="display:none;">
+        <section class="panel" id="noWalletState" style="display:none;">
       <div class="gate">
         <div class="badge"><i data-lucide="lock"></i></div>
         <h2>Connect your wallet</h2>
@@ -73,30 +71,28 @@
       </div>
     </section>
 
-    <!-- Shown if connected wallet doesn't own any stall -->
-    <section class="panel" id="notOwnerState" style="display:none;">
+        <section class="panel" id="notOwnerState" style="display:none;">
       <div class="gate">
         <div class="badge"><i data-lucide="shield-alert"></i></div>
         <h2>Sorry, this wallet doesn't own a stall</h2>
         <p>We couldn't find any stall registered under this address, so there's nothing to refund or withdraw. Apply for a stall first, or connect the wallet you registered with.</p>
-        <div class="addr" id="connectedAddrDisplay">—</div>
+        <div class="addr" id="connectedAddrDisplay">-</div>
       </div>
     </section>
 
-    <!-- Stall owner tools -->
-    <div id="ownerTools" style="display:none;">
+        <div id="ownerTools" style="display:none;">
 
       <section class="panel subtle">
         <h2>Your stalls</h2>
-        <p class="hint">Refunds and withdrawals are done right from each stall's card below — no need to remember or type a stall ID.</p>
+        <p class="hint">Refunds and withdrawals are done right from each stall's card below - no need to remember or type a stall ID.</p>
         <div id="myStallsList" class="stall-grid"></div>
       </section>
 
     </div>
 
-  </div>
+  </main>
 
-  <footer class="site-footer">CCN Hub — Powering CCN Day</footer>
+  <footer class="site-footer">CCN Hub - Powering CCN Day</footer>
 
 <script src="js/config.js"></script>
 <script src="js/wallet.js"></script>

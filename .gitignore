@@ -5,6 +5,6 @@ coverage/
 coverage.json
 .env
 
-# NOTE: deployments/ is intentionally NOT ignored — deployments/sepolia.json
+# NOTE: deployments/ is intentionally NOT ignored - deployments/sepolia.json
 # is how the CI/CD pipeline's "did the deployed address change?" diff and
 # the frontend's config.js sync stay honest across runs.

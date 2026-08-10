@@ -1,25 +1,49 @@
-/**
- * apply.js — page logic for apply.html (Apply for a Stall).
- * Requires wallet.js to be loaded first.
- *
- * Any connected wallet can submit an application — there is no on-chain
- * eligibility gate. The organiser is the actual gatekeeper: every
- * application starts Pending and only becomes usable once they approve it
- * from the Organiser Desk.
- */
 
 document.addEventListener('wallet:ready', ()=>{
   loadMyApplications();
+  refreshPendingApplicationGate();
 });
 document.addEventListener('wallet:disconnected', ()=>{
   document.getElementById('myApplicationsList').innerHTML =
-    '<p class="empty-state">Connect your wallet to see your applications.</p>';
+    emptyState(MESSAGES.connectToSeeApplications);
+  setRegisterFormGated(false); 
 });
+
+async function refreshPendingApplicationGate(){
+  if(!contract) return { hasPending: false };
+  try{
+    const [hasPending, stallId] = await contract.getPendingApplication(userAddress);
+    setRegisterFormGated(hasPending, hasPending ? Number(stallId) : null);
+    return { hasPending, stallId: Number(stallId) };
+  }catch(err){
+    
+    
+    console.error('Could not check pending application status:', err);
+    return { hasPending: false };
+  }
+}
+
+function setRegisterFormGated(gated, pendingStallId){
+  const btn = document.getElementById('registerBtn');
+  const input = document.getElementById('stallNameInput');
+  const notice = document.getElementById('pendingApplicationNotice');
+  if(btn) btn.disabled = !!gated;
+  if(input) input.disabled = !!gated;
+  if(notice){
+    if(gated){
+      notice.textContent = `You already have an application pending (Stall #${pendingStallId}). ` +
+        `You can submit a new one once it's approved or rejected.`;
+      notice.style.display = '';
+    }else{
+      notice.style.display = 'none';
+    }
+  }
+}
 
 async function loadMyApplications(){
   if(!contract) return;
   const list = document.getElementById('myApplicationsList');
-  list.innerHTML = '<p class="empty-state"><span class="spinner"></span>&nbsp; Loading…</p>';
+  list.innerHTML = emptyState(MESSAGES.loadingYourApplications, { spinner: true });
   try{
     const count = await contract.stallCount();
     const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
@@ -28,10 +52,10 @@ async function loadMyApplications(){
     for(let i=0; i<Number(count); i++){
       const s = await contract.getStall(i);
       if(s.owner.toLowerCase() === userAddress.toLowerCase()){
-        // NOTE: `s` is an ethers v6 Result (array-like with named getters).
-        // `{ id: i, ...s }` only copies the numeric indices, not the named
-        // fields (name, status, etc.) — so they'd end up undefined here.
-        // Map fields explicitly instead.
+        
+        
+        
+        
         mine.push({
           id: i,
           owner: s.owner,
@@ -48,7 +72,7 @@ async function loadMyApplications(){
     }
     list.innerHTML = '';
     if(mine.length === 0){
-      list.innerHTML = '<p class="empty-state">You haven\'t applied for a stall yet.</p>';
+      list.innerHTML = emptyState(MESSAGES.noApplicationsYet);
       return;
     }
     mine.forEach(s=>{
@@ -61,14 +85,14 @@ async function loadMyApplications(){
         <h3>${s.name}</h3>
         <p class="hint">${
           status===1 ? 'Awaiting organiser approval.' :
-          status===2 ? 'Approved — visible on the Browse & Pay page.' :
-          status===3 ? `Rejected — reason: ${s.rejectionReason}. Head to My Stall Tools to edit and resubmit.` : ''
+          status===2 ? 'Approved - visible on the Browse & Pay page.' :
+          status===3 ? `Rejected - reason: ${s.rejectionReason}. Head to My Stall Tools to edit and resubmit.` : ''
         }</p>
       `;
       list.appendChild(card);
     });
   }catch(err){
-    list.innerHTML = '<p class="empty-state">Could not load your applications.</p>';
+    list.innerHTML = emptyState(MESSAGES.couldNotLoadYourApplications);
     log('Could not load applications: ' + friendlyError(err), 'err');
   }
 }
@@ -78,6 +102,15 @@ document.getElementById('registerBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('stallNameInput').value.trim();
   if(!name){ log('Enter a stall name first.', 'err'); return; }
 
+  
+  
+  
+  const gate = await refreshPendingApplicationGate();
+  if(gate.hasPending){
+    log(MESSAGES.alreadyHasPendingApplication, 'err');
+    return;
+  }
+
   try{
     const tx = await contract.registerStall(name);
     log(`Registering "${name}"…`);
@@ -85,5 +118,9 @@ document.getElementById('registerBtn').addEventListener('click', async ()=>{
     log('Stall registered.', 'ok');
     document.getElementById('stallNameInput').value = '';
     loadMyApplications();
-  }catch(err){ log('Registration failed: ' + friendlyError(err), 'err'); }
+    refreshPendingApplicationGate();
+  }catch(err){
+    log('Registration failed: ' + friendlyError(err), 'err');
+    refreshPendingApplicationGate();
+  }
 });

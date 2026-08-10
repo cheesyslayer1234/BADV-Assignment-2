@@ -1,26 +1,7 @@
-/**
- * wallet.js
- *
- * Shared across index.html, manage.html and organiser.html:
- *   - contract config (address + ABI)
- *   - wallet connect/reconnect (via ethers.js + MetaMask)
- *   - toast notifications (replaces the old activity log)
- *   - hamburger drawer menu wiring
- *
- * Each page includes this file, then its own page script (stalls.js /
- * manage.js / organiser.js) which calls initWallet() and reacts to the
- * `wallet:ready` event once a signer + contract are available.
- *
- * CONTRACT_ADDRESS itself is NOT defined here anymore — it comes from
- * config.js, which must be loaded via <script src="config.js"></script>
- * BEFORE this file. config.js is auto-written by scripts/deploy.js on
- * every deploy, so the frontend always points at whatever you last
- * deployed without any manual editing.
- */
 
 if (typeof CONTRACT_ADDRESS === "undefined") {
   throw new Error(
-    "CONTRACT_ADDRESS is not defined — make sure config.js is included " +
+    "CONTRACT_ADDRESS is not defined - make sure config.js is included " +
       "with a <script> tag BEFORE wallet.js, and that you've deployed at " +
       "least once (npm run deploy:local or npm run deploy:sepolia)."
   );
@@ -44,6 +25,9 @@ const ABI = [
   "function withdrawFunds(uint256 stallId)",
   "function getStall(uint256 stallId) view returns (address owner, string name, uint256 balance, bool withdrawn, uint256 totalPaid, uint8 status, uint256 appliedAt, uint256 decidedAt, string rejectionReason)",
   "function getPayerCredit(uint256 stallId, address payer) view returns (uint256)",
+  "function getPendingApplication(address applicant) view returns (bool hasPending, uint256 stallId)",
+  "function hasPendingApplication(address) view returns (bool)",
+  "function pendingStallIdOf(address) view returns (uint256)",
   "event StallApplicationSubmitted(uint256 indexed stallId, address indexed applicant, string name, uint256 timestamp)",
   "event StallApproved(uint256 indexed stallId, address indexed organiser, uint256 timestamp)",
   "event StallRejected(uint256 indexed stallId, address indexed organiser, string reason, uint256 timestamp)",
@@ -51,21 +35,34 @@ const ABI = [
   "event PaymentMade(uint256 indexed stallId, address indexed payer, uint256 amount)",
   "event RefundIssued(uint256 indexed stallId, address indexed payer, uint256 amount)",
   "event CarnivalProcessed(uint256 timestamp)",
-  "event FundsWithdrawn(uint256 indexed stallId, address indexed owner, uint256 amount)"
+  "event FundsWithdrawn(uint256 indexed stallId, address indexed owner, uint256 amount)",
+  
+  
+  
+  
+  "error NotOrganiser()",
+  "error NotStallOwner(uint256 stallId)",
+  "error StallDoesNotExist(uint256 stallId)",
+  "error ReentrancyDetected()",
+  "error CarnivalNotYetProcessed()",
+  "error NothingToWithdraw()",
+  "error InsufficientStallBalance(uint256 available, uint256 requested)",
+  "error InsufficientPayerCredit(uint256 available, uint256 requested)",
+  "error ZeroAmount()",
+  "error EmptyStallName()",
+  "error AlreadyProcessed()",
+  "error TooEarlyToProcess()",
+  "error TransferFailed()",
+  "error StallNotPending(uint256 stallId)",
+  "error StallNotApproved(uint256 stallId)",
+  "error StallNotRejected(uint256 stallId)",
+  "error EmptyRejectionReason()",
+  "error ApplicantHasPendingApplication(address applicant, uint256 pendingStallId)"
 ];
 
 let provider, signer, contract, userAddress;
-let isWrongNetwork = false; // true while the button reads "Switch to <network>"
+let isWrongNetwork = false; 
 
-/* ---------------- Network validation ----------------
- * CONTRACT_NETWORK (from config.js) says which network the currently
- * configured CONTRACT_ADDRESS was actually deployed to. If the wallet is
- * connected to a *different* chain, CONTRACT_ADDRESS either has no code
- * there or points at an unrelated contract — every read/write will fail
- * with an opaque "missing revert data" / CALL_EXCEPTION, because the call
- * never reaches real contract code to produce a revert reason. We check
- * this up front and refuse to bind the contract on a mismatch, instead of
- * letting every page script hit that confusing error independently. */
 const CHAIN_IDS_BY_NETWORK = {
   localhost: 31337n,
   hardhat: 31337n,
@@ -73,21 +70,7 @@ const CHAIN_IDS_BY_NETWORK = {
 };
 const EXPECTED_CHAIN_ID = CHAIN_IDS_BY_NETWORK[CONTRACT_NETWORK];
 
-/* ---------------- Cross-page connection flag ----------------
- * MetaMask's `eth_accounts` call is silent (no popup) and will happily
- * hand back an address on *every* page as long as this site is still
- * authorised in the wallet — that's what makes the auto reconnect work
- * as you move between index/manage/organiser/browse/apply.
- *
- * The problem: MetaMask has no real "disconnect" for that permission,
- * so without extra state, a page you land on next will just silently
- * reconnect again. We fix that with our own flag in localStorage that
- * every page checks before attempting the silent reconnect. Clicking
- * "Disconnect" clears it (and best-effort revokes the permission too);
- * clicking "Connect Wallet" sets it again. */
 const WALLET_FLAG_KEY = 'ccn_wallet_connected';
-
-/* ---------------- Toasts (replaces the activity log) ---------------- */
 
 function ensureToastStack(){
   let stack = document.querySelector('.toast-stack');
@@ -123,33 +106,89 @@ function toast(msg, kind){
     setTimeout(()=> el.remove(), 260);
   }, life);
 }
-// kept as `log` too, so page scripts read naturally: log('...', 'ok'|'err')
+
 const log = toast;
 
-/** Turns a raw MetaMask/ethers error into a short, human-readable string
- *  for the toast — and always logs the full raw error to the browser
- *  console so nothing is lost for debugging. Never show err.message or a
- *  stringified error object directly in the UI: those are full RPC
- *  payloads / stack traces, not something a user should see. */
+const MESSAGES = {
+  checkingWallet: 'Checking wallet…',
+  connectToLoadStalls: 'Connect your wallet to load stalls.',
+  connectToSeeApplications: 'Connect your wallet to see your applications.',
+  loadingStalls: 'Loading stalls…',
+  loadingApplications: 'Loading applications…',
+  loadingYourApplications: 'Loading…',
+  noStalls: 'No stalls available yet.',
+  noApplicationsYet: "You haven't applied for a stall yet.",
+  noPendingApplications: 'No pending applications right now.',
+  noDecidedStalls: 'No decided stalls yet.',
+  couldNotLoadStalls: 'Could not load stalls.',
+  couldNotLoadApplications: 'Could not load applications.',
+  couldNotLoadYourApplications: 'Could not load your applications.',
+  alreadyHasPendingApplication: "You already have an application awaiting a decision - you can't submit another until it's approved or rejected.",
+};
+
+function emptyState(message, { spinner = false } = {}){
+  return `<p class="empty-state">${spinner ? '<span class="spinner"></span>&nbsp; ' : ''}${message}</p>`;
+}
+
+const CUSTOM_ERROR_MESSAGES = {
+  ApplicantHasPendingApplication: (args) =>
+    `You already have an application pending (Stall #${args?.[1] ?? args?.pendingStallId ?? '?'}) - ` +
+    `wait for the organiser to approve or reject it before submitting another.`,
+  EmptyStallName: () => 'Enter a stall name first.',
+  EmptyRejectionReason: () => 'Enter a reason before rejecting.',
+  StallNotPending: () => 'This application has already been decided - it can\'t be actioned again.',
+  StallNotApproved: () => 'This stall isn\'t approved yet, so it can\'t accept payments.',
+  StallNotRejected: () => 'Only a rejected application can be resubmitted.',
+  StallDoesNotExist: () => 'That stall doesn\'t exist.',
+  NotStallOwner: () => 'Only the stall owner can do that.',
+  NotOrganiser: () => 'Only the organiser can do that.',
+  ZeroAmount: () => 'Enter an amount greater than zero.',
+  NothingToWithdraw: () => 'There are no funds left to withdraw for this stall.',
+  CarnivalNotYetProcessed: () => 'Withdrawals open once the organiser has processed the carnival.',
+  TooEarlyToProcess: () => 'The carnival hasn\'t ended yet - check back after it wraps up.',
+  AlreadyProcessed: () => 'The carnival has already been marked as processed.',
+  InsufficientPayerCredit: (args) =>
+    `That refund is more than this payer contributed (they have ${args?.[0] ?? '?'} wei of credit left).`,
+  InsufficientStallBalance: (args) =>
+    `The stall doesn't have enough balance left to cover that refund (${args?.[0] ?? '?'} wei available).`,
+};
+
 function friendlyError(err){
   console.error(err);
 
-  // User closed the MetaMask popup / clicked "Reject".
+  
   if(err && (err.code === 'ACTION_REJECTED' || err.code === 4001)){
     return 'Transaction cancelled.';
   }
 
-  // A clean revert reason from the smart contract (require/revert message)
-  // is the one thing worth surfacing — everything else is internal plumbing.
+  
+  
+  
+  
+  const decoded = err && (err.revert || err.info?.error?.data ? err.revert : undefined);
+  if(decoded && decoded.name && CUSTOM_ERROR_MESSAGES[decoded.name]){
+    try{ return CUSTOM_ERROR_MESSAGES[decoded.name](decoded.args); }
+    catch(_e){  }
+  }
+
+  
+  
   let reason =
     err && (err.reason || err.shortMessage || err.info?.error?.message || err.data?.message);
   if(reason){
     reason = String(reason).replace(/^execution reverted:\s*/i, '').trim();
+    // The reason string is sometimes just the bare custom error name (no
+    // args) e.g. "ApplicantHasPendingApplication" - reuse the friendly
+    // map for those too, falling back to the raw name only if unmapped.
+    const bareName = reason.match(/^([A-Za-z0-9_]+)(\(.*\))?$/);
+    if(bareName && CUSTOM_ERROR_MESSAGES[bareName[1]]){
+      try{ return CUSTOM_ERROR_MESSAGES[bareName[1]](); }catch(_e){ /* ignore */ }
+    }
     // Guard against ethers still handing back something huge/JSON-ish.
     if(reason && reason.length <= 160 && !/^\{|^\[/.test(reason)) return reason;
   }
 
-  return 'Something went wrong — please try again.';
+  return 'Something went wrong - please try again.';
 }
 
 /* ---------------- Wallet connect / reconnect ---------------- */
@@ -213,7 +252,7 @@ function paintWrongNetwork(net){
     netEl.textContent = (net.name && net.name !== 'unknown' ? net.name : net.chainId.toString()) +
       ` (expected ${CONTRACT_NETWORK})`;
   }
-  // Not really "connect" in this state — repurpose the button to switch chains.
+  
   if(btn){
     btn.textContent = `Switch to ${CONTRACT_NETWORK}`;
     btn.disabled = false;
@@ -236,11 +275,11 @@ async function switchToExpectedNetwork(){
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: '0x' + EXPECTED_CHAIN_ID.toString(16) }]
     });
-    // MetaMask's chainChanged listener (wired below) reloads the page.
+    
   }catch(err){
     console.error(err);
     toast(
-      `Couldn't switch automatically — please switch MetaMask to ${CONTRACT_NETWORK} manually.`,
+      `Couldn't switch automatically - please switch MetaMask to ${CONTRACT_NETWORK} manually.`,
       'err'
     );
   }
@@ -252,12 +291,12 @@ async function bindWallet(){
   const net = await provider.getNetwork();
 
   if(EXPECTED_CHAIN_ID && net.chainId !== EXPECTED_CHAIN_ID){
-    // Wrong chain: CONTRACT_ADDRESS was deployed on CONTRACT_NETWORK, not
-    // whatever the wallet is currently pointed at. Do NOT construct the
-    // contract or fire wallet:ready — every read/write against it would
-    // fail with an opaque CALL_EXCEPTION ("missing revert data") because
-    // there's no matching contract code on this chain. Surface a clear,
-    // actionable message instead.
+    
+    
+    
+    
+    
+    
     contract = undefined;
     paintWrongNetwork(net);
     toast(
@@ -274,9 +313,6 @@ async function bindWallet(){
   document.dispatchEvent(new CustomEvent('wallet:ready', { detail: { userAddress, contract } }));
 }
 
-/** Called on every page load. Tries a *silent* reconnect (no popup) using
- *  eth_accounts — if this site was already authorised in MetaMask, the
- *  wallet reconnects automatically. Falls back to showing "Connect Wallet". */
 function paintContractChrome(){
   const drawerEl = document.getElementById('drawerContractAddr');
   if(drawerEl) drawerEl.textContent = shortAddr(CONTRACT_ADDRESS);
@@ -292,9 +328,9 @@ async function initWallet(){
     return;
   }
 
-  // If the user explicitly disconnected on some other page, honour that
-  // here too instead of silently reconnecting — this is what makes
-  // "Disconnect" actually stick as you move between pages.
+  
+  
+  
   if(localStorage.getItem(WALLET_FLAG_KEY) !== '1'){
     paintDisconnected();
     document.dispatchEvent(new CustomEvent('wallet:disconnected'));
@@ -304,7 +340,7 @@ async function initWallet(){
   provider = new ethers.BrowserProvider(window.ethereum);
 
   try{
-    const accounts = await provider.send('eth_accounts', []); // silent, no popup
+    const accounts = await provider.send('eth_accounts', []); 
     if(accounts.length > 0){
       await bindWallet();
     }else{
@@ -330,7 +366,7 @@ async function connectWallet(){
   }
   try{
     provider = new ethers.BrowserProvider(window.ethereum);
-    await provider.send('eth_requestAccounts', []); // this one *does* prompt
+    await provider.send('eth_requestAccounts', []); 
     await bindWallet();
     localStorage.setItem(WALLET_FLAG_KEY, '1');
     toast('Wallet connected.', 'ok');
@@ -339,12 +375,6 @@ async function connectWallet(){
   }
 }
 
-/** Disconnects the site's wallet state and stops the silent auto-reconnect
- *  on every other page. MetaMask itself doesn't expose a clean "disconnect"
- *  for eth_accounts permissions on all versions, so this does the best
- *  available thing: try the standard revoke call (recent MetaMask/EIP-2255
- *  wallets support it), then always clear our own local state regardless
- *  of whether that call succeeds. */
 async function disconnectWallet(){
   try{
     if(window.ethereum && window.ethereum.request){
@@ -354,8 +384,8 @@ async function disconnectWallet(){
       });
     }
   }catch(err){
-    // Not all wallets support this yet — that's fine, we still clear
-    // local state below so this site stops auto-reconnecting.
+    
+    
     console.error(err);
   }
 
@@ -378,8 +408,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   wireDrawer();
   if(window.lucide) lucide.createIcons();
 });
-
-/* ---------------- Hamburger drawer menu ---------------- */
 
 function wireDrawer(){
   const menuBtn = document.getElementById('menuBtn');

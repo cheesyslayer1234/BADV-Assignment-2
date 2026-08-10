@@ -19,6 +19,7 @@ contract CarnivalStallManager {
     error StallNotApproved(uint256 stallId);
     error StallNotRejected(uint256 stallId);
     error EmptyRejectionReason();
+    error ApplicantHasPendingApplication(address applicant, uint256 pendingStallId);
 
     address public organiser;
 
@@ -53,6 +54,15 @@ contract CarnivalStallManager {
 
     mapping(uint256 => mapping(address => uint256)) private payerCredit;
 
+    
+    
+    
+    
+    
+    
+    mapping(address => bool) public hasPendingApplication;
+    mapping(address => uint256) public pendingStallIdOf;
+
     event StallApplicationSubmitted(uint256 indexed stallId, address indexed applicant, string name, uint256 timestamp);
     event StallApproved(uint256 indexed stallId, address indexed organiser, uint256 timestamp);
     event StallRejected(uint256 indexed stallId, address indexed organiser, string reason, uint256 timestamp);
@@ -67,11 +77,11 @@ contract CarnivalStallManager {
         _;
     }
 
-    // FIX 3: single source of truth for the "does this stall exist" check.
-    // stallExists / onlyStallOwner / onlyApprovedStall all funnel through
-    // this internal helper instead of each repeating the same require line.
-    // Keeps the check consistent if it ever needs to change, and keeps each
-    // modifier focused on the *one* extra condition it's adding.
+    
+    
+    
+    
+    
     function _requireRegistered(uint256 stallId) internal view {
         if (!stalls[stallId].registered) revert StallDoesNotExist(stallId);
     }
@@ -93,6 +103,15 @@ contract CarnivalStallManager {
         _;
     }
 
+    
+    
+    
+    function _clearPendingFlag(address owner, uint256 stallId) internal {
+        if (hasPendingApplication[owner] && pendingStallIdOf[owner] == stallId) {
+            hasPendingApplication[owner] = false;
+        }
+    }
+
     modifier nonReentrant() {
         if (_reentrancyStatus == _ENTERED) revert ReentrancyDetected();
         _reentrancyStatus = _ENTERED;
@@ -105,17 +124,20 @@ contract CarnivalStallManager {
         carnivalEndTime = _carnivalEndTime;
     }
 
-    /// @notice Registers a stall application. Any address may call this —
-    /// there is no on-chain eligibility gate; access control for who is a
-    /// genuine TP student/staff member is expected to be handled off-chain
-    /// (e.g. only sharing the dApp link/wallet-connect flow with them),
-    /// with the organiser as the actual gatekeeper via approveStall/
-    /// rejectStall.
+    
+    
+    
+    
+    
+    
     function registerStall(string calldata name)
         external
         returns (uint256 stallId)
     {
         if (bytes(name).length == 0) revert EmptyStallName();
+        if (hasPendingApplication[msg.sender]) {
+            revert ApplicantHasPendingApplication(msg.sender, pendingStallIdOf[msg.sender]);
+        }
 
         stallId = stallCount;
         stalls[stallId] = Stall({
@@ -132,6 +154,9 @@ contract CarnivalStallManager {
         });
         stallCount += 1;
 
+        hasPendingApplication[msg.sender] = true;
+        pendingStallIdOf[msg.sender] = stallId;
+
         emit StallApplicationSubmitted(stallId, msg.sender, name, block.timestamp);
     }
 
@@ -142,11 +167,13 @@ contract CarnivalStallManager {
         stall.status = StallStatus.Approved;
         stall.decidedAt = block.timestamp;
 
+        _clearPendingFlag(stall.owner, stallId);
+
         emit StallApproved(stallId, msg.sender, block.timestamp);
     }
 
-    /// @notice Rejects a pending application. A non-empty reason is
-    /// mandatory so the applicant knows what to fix before resubmitting.
+    
+    
     function rejectStall(uint256 stallId, string calldata reason)
         external
         onlyOrganiser
@@ -160,12 +187,14 @@ contract CarnivalStallManager {
         stall.rejectionReason = reason;
         stall.decidedAt = block.timestamp;
 
+        _clearPendingFlag(stall.owner, stallId);
+
         emit StallRejected(stallId, msg.sender, reason, block.timestamp);
     }
 
-    /// @notice Lets a rejected stall's owner update and resubmit their
-    /// application. Moves the application back to Pending for another
-    /// round of organiser review, and clears the previous rejection reason.
+    
+    
+    
     function resubmitStall(uint256 stallId, string calldata newName)
         external
         onlyStallOwner(stallId)
@@ -173,12 +202,24 @@ contract CarnivalStallManager {
         Stall storage stall = stalls[stallId];
         if (stall.status != StallStatus.Rejected) revert StallNotRejected(stallId);
         if (bytes(newName).length == 0) revert EmptyStallName();
+        
+        
+        
+        
+        
+        
+        if (hasPendingApplication[msg.sender] && pendingStallIdOf[msg.sender] != stallId) {
+            revert ApplicantHasPendingApplication(msg.sender, pendingStallIdOf[msg.sender]);
+        }
 
         stall.name = newName;
         stall.status = StallStatus.Pending;
         stall.appliedAt = block.timestamp;
         stall.decidedAt = 0;
         stall.rejectionReason = "";
+
+        hasPendingApplication[msg.sender] = true;
+        pendingStallIdOf[msg.sender] = stallId;
 
         emit StallResubmitted(stallId, msg.sender, block.timestamp);
     }
@@ -221,9 +262,9 @@ contract CarnivalStallManager {
         emit RefundIssued(stallId, payer, amount);
     }
 
-    /// @notice Marks the carnival as processed. This can only happen after
-    /// carnivalEndTime has passed (i.e. "the following day"). Withdrawal
-    /// opens as soon as this has been done — see withdrawFunds below.
+    
+    
+    
     function processCarnivalEnd() external onlyOrganiser {
         if (carnivalProcessed) revert AlreadyProcessed();
         if (block.timestamp <= carnivalEndTime) revert TooEarlyToProcess();
@@ -234,14 +275,14 @@ contract CarnivalStallManager {
         emit CarnivalProcessed(block.timestamp);
     }
 
-    /// @notice Withdraws a stall's full collected balance to its owner.
-    /// Withdrawal opens as soon as the carnival has been processed by the
-    /// organiser (no additional delay on top of that — processCarnivalEnd
-    /// already can't be called until after carnivalEndTime). `amount == 0`
-    /// is checked before the (redundant, defense-in-depth) `withdrawn`
-    /// flag, so a second withdrawal attempt — where the balance is already
-    /// zero — correctly surfaces as NothingToWithdraw rather than a
-    /// separate AlreadyWithdrawn error.
+    
+    
+    
+    
+    
+    
+    
+    
     function withdrawFunds(uint256 stallId)
         external
         nonReentrant
@@ -297,9 +338,21 @@ contract CarnivalStallManager {
         return payerCredit[stallId][payer];
     }
 
-    /// @notice The withdrawal window is open once the organiser has
-    /// processed the carnival end. No additional fixed delay is stacked on
-    /// top of that.
+    
+    
+    
+    
+    function getPendingApplication(address applicant)
+        external
+        view
+        returns (bool hasPending, uint256 stallId)
+    {
+        return (hasPendingApplication[applicant], pendingStallIdOf[applicant]);
+    }
+
+    
+    
+    
     function isWithdrawalWindowOpen() public view returns (bool) {
         return carnivalProcessed;
     }
