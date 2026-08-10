@@ -11,8 +11,8 @@
  * clickable cards, so the organiser never has to know or type a stall ID.
  */
 
-const STATUS_NAMES = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
-const STATUS_CLASSES = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
+const STATUS_NAMES = ['None', 'Pending', 'Approved', 'Rejected'];
+const STATUS_CLASSES = ['', 'status-pending', 'status-approved', 'status-rejected'];
 
 function showState(id){
   ['checkingState','noWalletState','notOrganiserState','organiserTools'].forEach(s=>{
@@ -100,7 +100,6 @@ function renderDecidedCard(s){
   let statusLine;
   if(status === 2) statusLine = `Approved ${formatWhen(s.decidedAt)}`;
   else if(status === 3) statusLine = `Rejected ${formatWhen(s.decidedAt)} — reason: ${s.rejectionReason}`;
-  else if(status === 4) statusLine = 'Cancelled by owner';
   else statusLine = '';
   card.innerHTML = `
     <div class="id-tag">STALL #${s.id}</div>
@@ -155,20 +154,6 @@ document.getElementById('decidedToggle').addEventListener('click', (e)=>{
   const expanded = list.style.display !== 'none';
   list.style.display = expanded ? 'none' : 'block';
   e.currentTarget.setAttribute('aria-expanded', String(!expanded));
-});
-
-document.getElementById('startCarnivalBtn').addEventListener('click', async (e)=>{
-  e.target.disabled = true;
-  try{
-    const tx = await contract.startCarnival();
-    log('Starting the carnival…');
-    await tx.wait();
-    log('Carnival started — approved stalls can no longer cancel.', 'ok');
-  }catch(err){
-    log('Failed: ' + friendlyError(err), 'err');
-  }finally{
-    e.target.disabled = false;
-  }
 });
 
 document.getElementById('processBtn').addEventListener('click', async ()=>{

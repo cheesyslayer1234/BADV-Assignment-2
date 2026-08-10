@@ -20,7 +20,6 @@ contract CarnivalStallManager {
     error StallNotApproved(uint256 stallId);
     error StallNotRejected(uint256 stallId);
     error EmptyRejectionReason();
-    error CarnivalAlreadyStarted();
 
     address public organiser;
 
@@ -30,16 +29,11 @@ contract CarnivalStallManager {
 
     uint256 public carnivalProcessedAt;
 
-    // Organiser-flipped switch marking the moment the carnival actually
-    // begins. Distinct from carnivalEndTime (used for close-out/withdrawal
-    // timing): this only gates whether approved stalls may still cancel.
-    bool public carnivalStarted;
-
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
     uint256 private _reentrancyStatus = _NOT_ENTERED;
 
-    enum StallStatus { None, Pending, Approved, Rejected, Cancelled }
+    enum StallStatus { None, Pending, Approved, Rejected }
 
     struct Stall {
         address owner;
@@ -58,29 +52,12 @@ contract CarnivalStallManager {
 
     uint256 public stallCount;
 
-    // ---- Carnival-wide transparency accounting ----
-    // Running totals kept in storage (rather than summed on-demand across
-    // every stall) so anyone — no wallet, no manual per-stall lookups — can
-    // read one number for "how much has this carnival raised/refunded/paid
-    // out, ever" in a single free eth_call. This is what backs the public
-    // transparency dashboard.
-    uint256 public totalRaised;    // cumulative sum of every payStall() call, all-time
-    uint256 public totalRefunded;  // cumulative sum of every issueRefund() call, all-time
-    uint256 public totalWithdrawn; // cumulative sum of every withdrawFunds() call, all-time
-
-    uint256 public pendingCount;
-    uint256 public approvedCount;
-    uint256 public rejectedCount;
-    uint256 public cancelledCount;
-
     mapping(uint256 => mapping(address => uint256)) private payerCredit;
 
     event StallApplicationSubmitted(uint256 indexed stallId, address indexed applicant, string name, uint256 timestamp);
     event StallApproved(uint256 indexed stallId, address indexed organiser, uint256 timestamp);
     event StallRejected(uint256 indexed stallId, address indexed organiser, string reason, uint256 timestamp);
     event StallResubmitted(uint256 indexed stallId, address indexed owner, uint256 timestamp);
-    event StallCancelled(uint256 indexed stallId, address indexed owner, uint256 timestamp);
-    event CarnivalStarted(uint256 timestamp);
     event PaymentMade(uint256 indexed stallId, address indexed payer, uint256 amount);
     event RefundIssued(uint256 indexed stallId, address indexed payer, uint256 amount);
     event CarnivalProcessed(uint256 timestamp);
@@ -146,7 +123,6 @@ contract CarnivalStallManager {
             rejectionReason: ""
         });
         stallCount += 1;
-        pendingCount += 1;
 
         emit StallApplicationSubmitted(stallId, msg.sender, name, block.timestamp);
     }
@@ -157,8 +133,6 @@ contract CarnivalStallManager {
 
         stall.status = StallStatus.Approved;
         stall.decidedAt = block.timestamp;
-        pendingCount -= 1;
-        approvedCount += 1;
 
         emit StallApproved(stallId, msg.sender, block.timestamp);
     }
@@ -177,8 +151,6 @@ contract CarnivalStallManager {
         stall.status = StallStatus.Rejected;
         stall.rejectionReason = reason;
         stall.decidedAt = block.timestamp;
-        pendingCount -= 1;
-        rejectedCount += 1;
 
         emit StallRejected(stallId, msg.sender, reason, block.timestamp);
     }
@@ -199,34 +171,8 @@ contract CarnivalStallManager {
         stall.appliedAt = block.timestamp;
         stall.decidedAt = 0;
         stall.rejectionReason = "";
-        rejectedCount -= 1;
-        pendingCount += 1;
 
         emit StallResubmitted(stallId, msg.sender, block.timestamp);
-    }
-
-    /// @notice Lets an approved stall's owner voluntarily cancel before the
-    /// carnival starts. Once cancelled the stall drops out of Approved
-    /// status, so onlyApprovedStall (and therefore payStall) blocks it
-    /// immediately — no separate payment-side check needed.
-    function cancelStall(uint256 stallId) external onlyStallOwner(stallId) {
-        Stall storage stall = stalls[stallId];
-        if (stall.status != StallStatus.Approved) revert StallNotApproved(stallId);
-        if (carnivalStarted) revert CarnivalAlreadyStarted();
-
-        stall.status = StallStatus.Cancelled;
-        approvedCount -= 1;
-        cancelledCount += 1;
-
-        emit StallCancelled(stallId, msg.sender, block.timestamp);
-    }
-
-    /// @notice Organiser marks the carnival as having begun, closing the
-    /// window in which approved stalls may still cancel.
-    function startCarnival() external onlyOrganiser {
-        if (carnivalStarted) revert CarnivalAlreadyStarted();
-        carnivalStarted = true;
-        emit CarnivalStarted(block.timestamp);
     }
 
     function payStall(uint256 stallId)
@@ -239,7 +185,6 @@ contract CarnivalStallManager {
         Stall storage stall = stalls[stallId];
         stall.balance += msg.value;
         stall.totalPaid += msg.value;
-        totalRaised += msg.value;
 
         payerCredit[stallId][msg.sender] += msg.value;
 
@@ -261,7 +206,6 @@ contract CarnivalStallManager {
 
         payerCredit[stallId][payer] = credit - amount;
         stall.balance -= amount;
-        totalRefunded += amount;
 
         (bool ok, ) = payer.call{value: amount}("");
         if (!ok) revert TransferFailed();
@@ -293,7 +237,6 @@ contract CarnivalStallManager {
 
         stall.balance = 0;
         stall.withdrawn = true;
-        totalWithdrawn += amount;
 
         (bool ok, ) = payable(msg.sender).call{value: amount}("");
         if (!ok) revert TransferFailed();
@@ -341,58 +284,5 @@ contract CarnivalStallManager {
 
     function contractBalance() external view returns (uint256) {
         return address(this).balance;
-    }
-
-    /// @notice One-call summary for the public transparency dashboard —
-    /// carnival-wide totals and per-status stall counts, with no need to
-    /// loop over individual stalls or hold a wallet/signer. Returned as a
-    /// named struct (rather than a bare tuple) so callers get real field
-    /// names (stats.pendingCount, etc.) without needing return-parameter
-    /// names that would otherwise shadow the state variables of the same
-    /// name.
-    struct CarnivalStats {
-        uint256 stallCount;
-        uint256 pendingCount;
-        uint256 approvedCount;
-        uint256 rejectedCount;
-        uint256 cancelledCount;
-        uint256 totalRaised;
-        uint256 totalRefunded;
-        uint256 totalWithdrawn;
-        bool carnivalProcessed;
-        bool carnivalStarted;
-        uint256 carnivalEndTime;
-    }
-
-    function getCarnivalStats() external view returns (CarnivalStats memory stats) {
-        stats = CarnivalStats({
-            stallCount: stallCount,
-            pendingCount: pendingCount,
-            approvedCount: approvedCount,
-            rejectedCount: rejectedCount,
-            cancelledCount: cancelledCount,
-            totalRaised: totalRaised,
-            totalRefunded: totalRefunded,
-            totalWithdrawn: totalWithdrawn,
-            carnivalProcessed: carnivalProcessed,
-            carnivalStarted: carnivalStarted,
-            carnivalEndTime: carnivalEndTime
-        });
-    }
-
-    /// @notice Proves the contract's own bookkeeping (what it *says* it has
-    /// raised, refunded and paid out) matches the ETH it actually holds
-    /// right now. `expectedBalance` is derived purely from the running
-    /// totals above — nobody has to trust the numbers on a dashboard; they
-    /// can call this themselves (e.g. on Etherscan's "Read Contract" tab)
-    /// and compare against the contract's real balance.
-    function auditBalance()
-        external
-        view
-        returns (bool balanced, uint256 expectedBalance, uint256 actualBalance)
-    {
-        expectedBalance = totalRaised - totalRefunded - totalWithdrawn;
-        actualBalance = address(this).balance;
-        balanced = expectedBalance == actualBalance;
     }
 }

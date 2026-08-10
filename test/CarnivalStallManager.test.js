@@ -151,7 +151,7 @@ describe("CarnivalStallManager", function () {
     });
   });
 
-  describe("Additional Feature 1: Resubmission, cancellation & carnival-start gate", function () {
+  describe("Additional Feature 1: Resubmission of rejected applications", function () {
     beforeEach(async function () {
       await contract.connect(student).registerStall("Waffle Wonderland");
     });
@@ -167,10 +167,6 @@ describe("CarnivalStallManager", function () {
       expect(stall.status).to.equal(1); // Pending
       expect(stall.name).to.equal("Waffle Wonderland v2");
       expect(stall.rejectionReason).to.equal("");
-
-      const stats = await contract.getCarnivalStats();
-      expect(stats.pendingCount).to.equal(1);
-      expect(stats.rejectedCount).to.equal(0);
     });
 
     it("blocks resubmission of a stall that isn't rejected", async function () {
@@ -194,65 +190,6 @@ describe("CarnivalStallManager", function () {
         .to.emit(contract, "StallApproved");
       const stall = await contract.getStall(0);
       expect(stall.status).to.equal(2); // Approved
-    });
-
-    it("lets an approved owner cancel before the carnival starts", async function () {
-      await contract.connect(organiser).approveStall(0);
-
-      await expect(contract.connect(student).cancelStall(0))
-        .to.emit(contract, "StallCancelled")
-        .withArgs(0, student.address, anyValue);
-
-      const stall = await contract.getStall(0);
-      expect(stall.status).to.equal(4); // Cancelled
-
-      const stats = await contract.getCarnivalStats();
-      expect(stats.approvedCount).to.equal(0);
-      expect(stats.cancelledCount).to.equal(1);
-    });
-
-    it("blocks payments to a cancelled stall", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(student).cancelStall(0);
-
-      await expect(
-        contract.connect(buyer1).payStall(0, { value: ethers.parseEther("1") })
-      ).to.be.revertedWithCustomError(contract, "StallNotApproved");
-    });
-
-    it("only allows the stall owner to cancel", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await expect(
-        contract.connect(stranger).cancelStall(0)
-      ).to.be.revertedWithCustomError(contract, "NotStallOwner");
-    });
-
-    it("can only cancel a stall that is currently Approved", async function () {
-      await expect(
-        contract.connect(student).cancelStall(0) // still Pending
-      ).to.be.revertedWithCustomError(contract, "StallNotApproved");
-    });
-
-    it("blocks cancellation once the organiser has started the carnival", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(organiser).startCarnival();
-
-      await expect(
-        contract.connect(student).cancelStall(0)
-      ).to.be.revertedWithCustomError(contract, "CarnivalAlreadyStarted");
-    });
-
-    it("only the organiser can start the carnival, and only once", async function () {
-      await expect(
-        contract.connect(stranger).startCarnival()
-      ).to.be.revertedWithCustomError(contract, "NotOrganiser");
-
-      await expect(contract.connect(organiser).startCarnival())
-        .to.emit(contract, "CarnivalStarted");
-
-      await expect(
-        contract.connect(organiser).startCarnival()
-      ).to.be.revertedWithCustomError(contract, "CarnivalAlreadyStarted");
     });
   });
 
@@ -406,91 +343,4 @@ describe("CarnivalStallManager", function () {
     });
   });
 
-  describe("Additional Feature: Transparency accounting", function () {
-    beforeEach(async function () {
-      await contract.connect(student).registerStall("Waffle Wonderland");
-      await contract.connect(staff).registerStall("Iced Tea Stand");
-    });
-
-    it("tracks pending/approved/rejected counts as applications move through review", async function () {
-      let stats = await contract.getCarnivalStats();
-      expect(stats.pendingCount).to.equal(2);
-      expect(stats.approvedCount).to.equal(0);
-      expect(stats.rejectedCount).to.equal(0);
-
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(organiser).rejectStall(1, "Duplicate category");
-
-      stats = await contract.getCarnivalStats();
-      expect(stats.pendingCount).to.equal(0);
-      expect(stats.approvedCount).to.equal(1);
-      expect(stats.rejectedCount).to.equal(1);
-      expect(stats.stallCount).to.equal(2);
-    });
-
-    it("accumulates totalRaised across payments to multiple stalls", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(organiser).approveStall(1);
-
-      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("1") });
-      await contract.connect(buyer2).payStall(1, { value: ethers.parseEther("2") });
-
-      const stats = await contract.getCarnivalStats();
-      expect(stats.totalRaised).to.equal(ethers.parseEther("3"));
-      expect(stats.totalRefunded).to.equal(0);
-      expect(stats.totalWithdrawn).to.equal(0);
-    });
-
-    it("accumulates totalRefunded independently of totalRaised", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("2") });
-      await contract.connect(student).issueRefund(0, buyer1.address, ethers.parseEther("0.5"));
-
-      const stats = await contract.getCarnivalStats();
-      expect(stats.totalRaised).to.equal(ethers.parseEther("2"));
-      expect(stats.totalRefunded).to.equal(ethers.parseEther("0.5"));
-    });
-
-    it("accumulates totalWithdrawn after payout", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("1") });
-
-      await time.increaseTo(carnivalEndTime + 1);
-      await contract.connect(organiser).processCarnivalEnd();
-      await time.increase(24 * 60 * 60 + 1);
-      await contract.connect(student).withdrawFunds(0);
-
-      const stats = await contract.getCarnivalStats();
-      expect(stats.totalWithdrawn).to.equal(ethers.parseEther("1"));
-    });
-
-    it("auditBalance() reports balanced=true when bookkeeping matches the real balance", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("2") });
-      await contract.connect(student).issueRefund(0, buyer1.address, ethers.parseEther("0.5"));
-
-      const audit = await contract.auditBalance();
-      const actualBalance = await ethers.provider.getBalance(await contract.getAddress());
-
-      expect(audit.balanced).to.equal(true);
-      expect(audit.expectedBalance).to.equal(ethers.parseEther("1.5"));
-      expect(audit.actualBalance).to.equal(actualBalance);
-    });
-
-    it("auditBalance() stays balanced through the full raise -> refund -> withdraw lifecycle", async function () {
-      await contract.connect(organiser).approveStall(0);
-      await contract.connect(buyer1).payStall(0, { value: ethers.parseEther("3") });
-      await contract.connect(student).issueRefund(0, buyer1.address, ethers.parseEther("1"));
-
-      await time.increaseTo(carnivalEndTime + 1);
-      await contract.connect(organiser).processCarnivalEnd();
-      await time.increase(24 * 60 * 60 + 1);
-      await contract.connect(student).withdrawFunds(0);
-
-      const audit = await contract.auditBalance();
-      expect(audit.balanced).to.equal(true);
-      expect(audit.expectedBalance).to.equal(0);
-      expect(audit.actualBalance).to.equal(0);
-    });
-  });
 });

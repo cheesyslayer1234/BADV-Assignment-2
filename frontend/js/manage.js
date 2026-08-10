@@ -51,16 +51,13 @@ async function findMyStalls(){
 }
 
 async function renderMyStalls(myStalls){
-  const statusNames = ['None', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
-  const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected', 'status-cancelled'];
+  const statusNames = ['None', 'Pending', 'Approved', 'Rejected'];
+  const statusClasses = ['', 'status-pending', 'status-approved', 'status-rejected'];
   const list = document.getElementById('myStallsList');
   list.innerHTML = '';
 
   let withdrawalWindowOpen = false;
   try{ withdrawalWindowOpen = await contract.isWithdrawalWindowOpen(); }catch(err){ console.error(err); /* default false */ }
-
-  let carnivalStarted = false;
-  try{ carnivalStarted = await contract.carnivalStarted(); }catch(err){ console.error(err); /* default false */ }
 
   myStalls.forEach(s=>{
     const status = Number(s.status);
@@ -68,7 +65,7 @@ async function renderMyStalls(myStalls){
     card.className = 'stall-card';
 
     let actionsHtml = '';
-    if(status === 2){ // Approved — only approved stalls can hold/refund/withdraw balance, and cancel
+    if(status === 2){ // Approved — only approved stalls can hold/refund/withdraw balance
       const canWithdraw = withdrawalWindowOpen && Number(s.balance) > 0 && !s.withdrawn;
       actionsHtml = `
         <div class="stall-actions">
@@ -83,10 +80,6 @@ async function renderMyStalls(myStalls){
           ${s.withdrawn ? '<p class="hint">Already withdrawn.</p>' :
             (!withdrawalWindowOpen ? '<p class="hint">Withdrawals open once the organiser processes the carnival close-out, plus one further day.</p>' :
              Number(s.balance) === 0 ? '<p class="hint">Nothing to withdraw yet.</p>' : '')}
-          <div class="actions">
-            <button class="ghost cancel-btn" ${carnivalStarted ? 'disabled' : ''}>Cancel this stall</button>
-          </div>
-          ${carnivalStarted ? '<p class="hint">The carnival has started — cancellation is no longer available.</p>' : ''}
         </div>
       `;
     } else if(status === 3){ // Rejected — owner can edit and resubmit
@@ -108,7 +101,6 @@ async function renderMyStalls(myStalls){
       <div class="meta"><span>Total received</span><b>${ethers.formatEther(s.totalPaid)} ETH</b></div>
       ${status===1 ? '<p class="hint">Awaiting organiser approval.</p>' : ''}
       ${status===3 ? `<p class="hint">Rejected — reason: ${s.rejectionReason}</p>` : ''}
-      ${status===4 ? '<p class="hint">You cancelled this stall.</p>' : ''}
       ${actionsHtml}
     `;
 
@@ -138,22 +130,6 @@ async function renderMyStalls(myStalls){
         }catch(err){
           log('Withdrawal failed: ' + friendlyError(err), 'err');
           withdrawBtn.disabled = false;
-        }
-      });
-
-      const cancelBtn = card.querySelector('.cancel-btn');
-      cancelBtn.addEventListener('click', async ()=>{
-        if(!window.confirm(`Cancel stall #${s.id} ("${s.name}")? This cannot be undone.`)) return;
-        cancelBtn.disabled = true;
-        try{
-          const tx = await contract.cancelStall(s.id);
-          log(`Cancelling stall #${s.id}…`);
-          await tx.wait();
-          log('Stall cancelled.', 'ok');
-          document.dispatchEvent(new CustomEvent('wallet:ready'));
-        }catch(err){
-          log('Cancellation failed: ' + friendlyError(err), 'err');
-          cancelBtn.disabled = false;
         }
       });
     }
