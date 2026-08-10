@@ -127,7 +127,7 @@ button.connect.outline:hover{background:rgba(255,255,255,0.12); color:#fff; bord
 }
 .drawer-close svg{width:16px; height:16px;}
 .drawer-close:hover{background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.7);}
-.drawer nav{display:flex; flex-direction:column; padding:6px 10px;}
+.drawer nav{display:flex; flex-direction:column; gap:6px; padding:6px 10px;}
 .drawer nav a{
   display:flex; flex-direction:column; gap:2px;
   padding:12px 12px; border-radius:var(--radius-sm); font-weight:600; font-size:14.5px;
@@ -264,6 +264,7 @@ button:disabled{opacity:.45; cursor:not-allowed; transform:none !important;}
 .stall-card .meta b{color:var(--red);}
 
 .empty-state{
+  grid-column:1 / -1;
   text-align:center; padding:34px 20px; color:var(--ink-faint); font-size:13.5px;
 }
 .spinner{
