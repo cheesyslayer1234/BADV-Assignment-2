@@ -3,23 +3,24 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Browse &amp; Pay Stalls — CCN Day Carnival</title>
+<title>Browse &amp; Pay Stalls — CCN Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Sora:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/styles.css" />
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js"></script>
 </head>
 <body>
 
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brand">
+      <a class="brand" href="index.html" aria-label="Go to homepage">
         <img class="crest" src="assets/logo.png" alt="CCN Day logo" />
         <div class="brand-text">
           <span class="kicker">Campus Care Network</span>
-          <span class="title">CCN Day · Central Platform</span>
+          <span class="title">CCN Hub</span>
         </div>
-      </div>
+      </a>
       <div class="topbar-right">
         <div id="statusPill" class="status-pill">Wallet not connected</div>
         <button class="connect" id="connectBtn">Connect Wallet</button>
@@ -35,23 +36,26 @@
   <aside class="drawer" id="drawer" aria-label="Site menu">
     <div class="drawer-head">
       <span>Menu</span>
-      <button class="drawer-close" id="drawerClose" aria-label="Close menu">✕</button>
+      <button class="drawer-close" id="drawerClose" aria-label="Close menu"><i data-lucide="x"></i></button>
     </div>
     <nav>
       <a href="index.html"><span>About CCN Day</span><small>What the carnival is, when &amp; where</small></a>
       <a href="apply.html"><span>Apply for a Stall</span><small>Register your stall</small></a>
-      <a href="browse.html" class="active"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall — you are here</small></a>
+      <a href="browse.html" class="active"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall</small></a>
       <a href="manage.html"><span>My Stall Tools</span><small>Refunds &amp; withdrawals</small></a>
       <a href="organiser.html"><span>Organiser Desk</span><small>Approvals, close-out</small></a>
     </nav>
-    <div class="drawer-foot">CONTRACT <span id="drawerContractAddr">—</span></div>
+    <div class="drawer-foot">
+      CONTRACT <span id="drawerContractAddr">—</span><br />
+      NETWORK <span id="networkName">—</span>
+    </div>
   </aside>
 
   <div class="wrap" style="padding-top:32px;">
 
     <section class="panel subtle" style="margin-top:0;">
       <h2>Browse &amp; Pay Stalls</h2>
-      <p class="hint">Connect any wallet — no eligibility check needed to pay — and pay an <b>approved</b> stall directly in ETH. Contract <b id="contractAddrShort">not set</b> · Network <b id="networkName">—</b></p>
+      <p class="hint">Connect any wallet — no eligibility check needed to pay — and pay an <b>approved</b> stall directly in ETH.</p>
     </section>
 
     <section class="panel">
@@ -65,19 +69,7 @@
 
   </div>
 
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <div class="title">CCN Day Carnival</div>
-        <p>Campus Care Network — bringing TP students and staff together twice a year to raise funds for students in need, in the spirit of caring and sharing.</p>
-      </div>
-      <div class="footer-meta">
-        Built on CarnivalStallManager.sol<br/>
-        Independent student project — design inspired by TP's visual identity, not an official TP site.
-      </div>
-    </div>
-    <div class="footer-bar">CCN Day Carnival — Central Platform</div>
-  </footer>
+  <footer class="site-footer">CCN Hub — Powering CCN Day</footer>
 
 <script src="js/config.js"></script>
 <script src="js/wallet.js"></script>

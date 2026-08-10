@@ -53,7 +53,7 @@ async function loadMyApplications(){
     });
   }catch(err){
     list.innerHTML = '<p class="empty-state">Could not load your applications.</p>';
-    log('Could not load applications: ' + (err.reason || err.message || err), 'err');
+    log('Could not load applications: ' + friendlyError(err), 'err');
   }
 }
 
@@ -69,5 +69,5 @@ document.getElementById('registerBtn').addEventListener('click', async ()=>{
     log('Stall registered.', 'ok');
     document.getElementById('stallNameInput').value = '';
     loadMyApplications();
-  }catch(err){ log('Registration failed: ' + (err.reason || err.message || err), 'err'); }
+  }catch(err){ log('Registration failed: ' + friendlyError(err), 'err'); }
 });

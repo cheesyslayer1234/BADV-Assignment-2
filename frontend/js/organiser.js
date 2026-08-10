@@ -36,7 +36,7 @@ document.addEventListener('wallet:ready', async ()=>{
       showState('notOrganiserState');
     }
   }catch(err){
-    log('Could not verify organiser: ' + (err.reason || err.message || err), 'err');
+    log('Could not verify organiser: ' + friendlyError(err), 'err');
     showState('notOrganiserState');
   }
 });
@@ -71,7 +71,7 @@ function renderPendingCard(s){
       log('Stall approved — it can now accept payments.', 'ok');
       loadStalls();
     }catch(err){
-      log('Approval failed: ' + (err.reason || err.message || err), 'err');
+      log('Approval failed: ' + friendlyError(err), 'err');
       e.target.disabled = false;
     }
   });
@@ -86,7 +86,7 @@ function renderPendingCard(s){
       log('Stall rejected.', 'ok');
       loadStalls();
     }catch(err){
-      log('Rejection failed: ' + (err.reason || err.message || err), 'err');
+      log('Rejection failed: ' + friendlyError(err), 'err');
       e.target.disabled = false;
     }
   });
@@ -145,7 +145,7 @@ async function loadStalls(){
     }
   }catch(err){
     pendingList.innerHTML = '<p class="empty-state">Could not load applications.</p>';
-    log('Could not load stalls: ' + (err.reason || err.message || err), 'err');
+    log('Could not load stalls: ' + friendlyError(err), 'err');
   }
 }
 document.getElementById('refreshStallsBtn').addEventListener('click', loadStalls);
@@ -165,7 +165,7 @@ document.getElementById('startCarnivalBtn').addEventListener('click', async (e)=
     await tx.wait();
     log('Carnival started — approved stalls can no longer cancel.', 'ok');
   }catch(err){
-    log('Failed: ' + (err.reason || err.message || err), 'err');
+    log('Failed: ' + friendlyError(err), 'err');
   }finally{
     e.target.disabled = false;
   }
@@ -177,7 +177,7 @@ document.getElementById('processBtn').addEventListener('click', async ()=>{
     log('Processing carnival end-of-day…');
     await tx.wait();
     log('Carnival processed. Withdrawals open 24h from now.', 'ok');
-  }catch(err){ log('Failed: ' + (err.reason || err.message || err), 'err'); }
+  }catch(err){ log('Failed: ' + friendlyError(err), 'err'); }
 });
 
 

@@ -54,7 +54,7 @@ async function loadStalls(){
             await tx.wait();
             log(`Payment confirmed for stall #${i}.`, 'ok');
             loadStalls();
-          }catch(err){ log('Payment failed: ' + (err.reason || err.message || err), 'err'); }
+          }catch(err){ log('Payment failed: ' + friendlyError(err), 'err'); }
         });
       }
 
@@ -65,7 +65,7 @@ async function loadStalls(){
     }
   }catch(err){
     grid.innerHTML = '<p class="empty-state">Could not load stalls.</p>';
-    log('Could not load stalls: ' + (err.reason || err.message || err), 'err');
+    log('Could not load stalls: ' + friendlyError(err), 'err');
   }
 }
 document.getElementById('refreshBtn').addEventListener('click', loadStalls);

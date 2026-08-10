@@ -33,7 +33,7 @@ document.addEventListener('wallet:ready', async ()=>{
       showState('notOwnerState');
     }
   }catch(err){
-    log('Could not check stall ownership: ' + (err.reason || err.message || err), 'err');
+    log('Could not check stall ownership: ' + friendlyError(err), 'err');
     showState('notOwnerState');
   }
 });
@@ -57,10 +57,10 @@ async function renderMyStalls(myStalls){
   list.innerHTML = '';
 
   let withdrawalWindowOpen = false;
-  try{ withdrawalWindowOpen = await contract.isWithdrawalWindowOpen(); }catch(err){ /* default false */ }
+  try{ withdrawalWindowOpen = await contract.isWithdrawalWindowOpen(); }catch(err){ console.error(err); /* default false */ }
 
   let carnivalStarted = false;
-  try{ carnivalStarted = await contract.carnivalStarted(); }catch(err){ /* default false */ }
+  try{ carnivalStarted = await contract.carnivalStarted(); }catch(err){ console.error(err); /* default false */ }
 
   myStalls.forEach(s=>{
     const status = Number(s.status);
@@ -123,7 +123,7 @@ async function renderMyStalls(myStalls){
           await tx.wait();
           log('Refund sent.', 'ok');
           document.dispatchEvent(new CustomEvent('wallet:ready')); // cheap way to re-fetch balances
-        }catch(err){ log('Refund failed: ' + (err.reason || err.message || err), 'err'); }
+        }catch(err){ log('Refund failed: ' + friendlyError(err), 'err'); }
       });
 
       const withdrawBtn = card.querySelector('.withdraw-btn');
@@ -136,7 +136,7 @@ async function renderMyStalls(myStalls){
           log('Withdrawal complete.', 'ok');
           document.dispatchEvent(new CustomEvent('wallet:ready'));
         }catch(err){
-          log('Withdrawal failed: ' + (err.reason || err.message || err), 'err');
+          log('Withdrawal failed: ' + friendlyError(err), 'err');
           withdrawBtn.disabled = false;
         }
       });
@@ -152,7 +152,7 @@ async function renderMyStalls(myStalls){
           log('Stall cancelled.', 'ok');
           document.dispatchEvent(new CustomEvent('wallet:ready'));
         }catch(err){
-          log('Cancellation failed: ' + (err.reason || err.message || err), 'err');
+          log('Cancellation failed: ' + friendlyError(err), 'err');
           cancelBtn.disabled = false;
         }
       });
@@ -170,7 +170,7 @@ async function renderMyStalls(myStalls){
           log('Application resubmitted — awaiting organiser review.', 'ok');
           document.dispatchEvent(new CustomEvent('wallet:ready'));
         }catch(err){
-          log('Resubmission failed: ' + (err.reason || err.message || err), 'err');
+          log('Resubmission failed: ' + friendlyError(err), 'err');
           e.target.disabled = false;
         }
       });

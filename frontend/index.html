@@ -3,25 +3,29 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CCN Day Carnival 2026</title>
-<meta name="description" content="CCN Day Carnival 2026 — Campus Care Network's stall carnival, raising funds for TP students in need." />
+<title>CCN Hub — Powering CCN Day</title>
+<meta name="description" content="CCN Hub — powering CCN Day, Campus Care Network's stall platform raising funds for TP students in need." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Sora:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/styles.css" />
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js"></script>
 </head>
 <body>
 
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brand">
+      <a class="brand" href="index.html" aria-label="Go to homepage">
         <img class="crest" src="assets/logo.png" alt="CCN Day logo" />
         <div class="brand-text">
           <span class="kicker">Campus Care Network</span>
-          <span class="title">CCN Day · Central Platform</span>
+          <span class="title">CCN Hub</span>
         </div>
-      </div>
+      </a>
       <div class="topbar-right">
-        <a href="browse.html" class="connect" style="display:inline-block; padding:10px 18px;">Enter Central Platform</a>
+        <div id="statusPill" class="status-pill">Wallet not connected</div>
+        <button class="connect" id="connectBtn">Connect Wallet</button>
+        <button class="connect outline" id="disconnectBtn" style="display:none;">Disconnect</button>
         <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
@@ -33,16 +37,19 @@
   <aside class="drawer" id="drawer" aria-label="Site menu">
     <div class="drawer-head">
       <span>Menu</span>
-      <button class="drawer-close" id="drawerClose" aria-label="Close menu">✕</button>
+      <button class="drawer-close" id="drawerClose" aria-label="Close menu"><i data-lucide="x"></i></button>
     </div>
     <nav>
-      <a href="index.html" class="active"><span>About CCN Day</span><small>You are here</small></a>
+      <a href="index.html" class="active"><span>About CCN Day</span><small>What the carnival is, when &amp; where</small></a>
       <a href="apply.html"><span>Apply for a Stall</span><small>Register your stall</small></a>
       <a href="browse.html"><span>Browse &amp; Pay Stalls</span><small>Pay an approved stall</small></a>
       <a href="manage.html"><span>My Stall Tools</span><small>Refunds &amp; withdrawals</small></a>
       <a href="organiser.html"><span>Organiser Desk</span><small>Approvals, close-out</small></a>
     </nav>
-    <div class="drawer-foot">CONTRACT <span id="drawerContractAddr">0xd2a5…d005</span></div>
+    <div class="drawer-foot">
+      CONTRACT <span id="drawerContractAddr">—</span><br />
+      NETWORK <span id="networkName">—</span>
+    </div>
   </aside>
 
   <header class="landing-hero">
@@ -61,22 +68,22 @@
     <p class="section-sub">Campus Care Network (CCN) runs this carnival twice a year in the spirit of caring and sharing — bringing students and staff together to raise funds for TP students who need a helping hand.</p>
     <div class="about-grid">
       <div class="about-card">
-        <div class="icon">🎪</div>
+        <div class="icon"><i data-lucide="store"></i></div>
         <h3>Stalls run by the campus</h3>
         <p>Students and staff apply to run a stall — food, games, crafts — and the organiser reviews each application.</p>
       </div>
       <div class="about-card">
-        <div class="icon">💳</div>
+        <div class="icon"><i data-lucide="wallet"></i></div>
         <h3>Pay straight from your wallet</h3>
         <p>No cash, no queues at a booth. Festival-goers pay approved stalls directly in ETH from any wallet.</p>
       </div>
       <div class="about-card">
-        <div class="icon">🤝</div>
+        <div class="icon"><i data-lucide="heart-handshake"></i></div>
         <h3>Funds go where they're needed</h3>
         <p>Once the carnival closes, stall earnings are withdrawn and every cent supports TP students facing hardship.</p>
       </div>
       <div class="about-card">
-        <div class="icon">🔍</div>
+        <div class="icon"><i data-lucide="search-check"></i></div>
         <h3>Fully transparent</h3>
         <p>Every application, approval, payment and refund is an on-chain event anyone can verify.</p>
       </div>
@@ -123,38 +130,13 @@
 
   <div class="landing-cta-band">
     <h2>Running a stall this year?</h2>
-    <p>Apply for your stall and check your approval status straight from the Central Platform app.</p>
+    <p>Apply for your stall and check your approval status straight from the CCN Hub app.</p>
     <a href="apply.html" class="btn-lg solid" style="color:var(--red);">Apply for a stall →</a>
   </div>
 
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <div class="title">CCN Day Carnival</div>
-        <p>Campus Care Network — bringing TP students and staff together twice a year to raise funds for students in need, in the spirit of caring and sharing.</p>
-      </div>
-      <div class="footer-meta">
-        Built on CarnivalStallManager.sol<br/>
-        Independent student project — design inspired by TP's visual identity, not an official TP site.
-      </div>
-    </div>
-    <div class="footer-bar">CCN Day Carnival — Central Platform</div>
-  </footer>
+  <footer class="site-footer">CCN Hub — Powering CCN Day</footer>
 
-<script>
-  // Landing page has no wallet logic — just the hamburger drawer.
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const menuBtn = document.getElementById('menuBtn');
-    const drawer = document.getElementById('drawer');
-    const backdrop = document.getElementById('drawerBackdrop');
-    const closeBtn = document.getElementById('drawerClose');
-    function open(){ drawer.classList.add('open'); backdrop.classList.add('open'); menuBtn.setAttribute('aria-expanded','true'); }
-    function close(){ drawer.classList.remove('open'); backdrop.classList.remove('open'); menuBtn.setAttribute('aria-expanded','false'); }
-    menuBtn.addEventListener('click', ()=> drawer.classList.contains('open') ? close() : open());
-    backdrop.addEventListener('click', close);
-    closeBtn.addEventListener('click', close);
-    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') close(); });
-  });
-</script>
+<script src="js/config.js"></script>
+<script src="js/wallet.js"></script>
 </body>
 </html>

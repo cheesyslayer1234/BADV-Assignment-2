@@ -110,8 +110,20 @@ function toast(msg, kind){
   const stack = ensureToastStack();
   const el = document.createElement('div');
   el.className = 'toast' + (kind ? ' ' + kind : '');
-  el.textContent = msg;
+
+  const iconName = kind === 'ok' ? 'circle-check' : kind === 'err' ? 'circle-x' : 'loader-circle';
+  const icon = document.createElement('i');
+  icon.className = 'toast-icon';
+  icon.setAttribute('data-lucide', iconName);
+
+  const text = document.createElement('span');
+  text.textContent = msg;
+
+  el.appendChild(icon);
+  el.appendChild(text);
   stack.appendChild(el);
+  if(window.lucide) lucide.createIcons();
+
   const life = kind === 'err' ? 6000 : 4200;
   setTimeout(()=>{
     el.classList.add('fade-out');
@@ -121,9 +133,35 @@ function toast(msg, kind){
 // kept as `log` too, so page scripts read naturally: log('...', 'ok'|'err')
 const log = toast;
 
+/** Turns a raw MetaMask/ethers error into a short, human-readable string
+ *  for the toast — and always logs the full raw error to the browser
+ *  console so nothing is lost for debugging. Never show err.message or a
+ *  stringified error object directly in the UI: those are full RPC
+ *  payloads / stack traces, not something a user should see. */
+function friendlyError(err){
+  console.error(err);
+
+  // User closed the MetaMask popup / clicked "Reject".
+  if(err && (err.code === 'ACTION_REJECTED' || err.code === 4001)){
+    return 'Transaction cancelled.';
+  }
+
+  // A clean revert reason from the smart contract (require/revert message)
+  // is the one thing worth surfacing — everything else is internal plumbing.
+  let reason =
+    err && (err.reason || err.shortMessage || err.info?.error?.message || err.data?.message);
+  if(reason){
+    reason = String(reason).replace(/^execution reverted:\s*/i, '').trim();
+    // Guard against ethers still handing back something huge/JSON-ish.
+    if(reason && reason.length <= 160 && !/^\{|^\[/.test(reason)) return reason;
+  }
+
+  return 'Something went wrong — please try again.';
+}
+
 /* ---------------- Wallet connect / reconnect ---------------- */
 
-function shortAddr(addr){ return addr.slice(0,6) + '…' + addr.slice(-4); }
+function shortAddr(addr){ return addr.slice(0,8) + '••••••' + addr.slice(-6); }
 
 function paintConnected(addr, net){
   const pill = document.getElementById('statusPill');
@@ -145,7 +183,7 @@ function paintConnected(addr, net){
   }
   const netEl = document.getElementById('networkName');
   if(netEl && net) netEl.textContent = net.name && net.name !== 'unknown' ? net.name : net.chainId.toString();
-  const contractEl = document.getElementById('contractAddrShort');
+  const contractEl = document.getElementById('drawerContractAddr');
   if(contractEl) contractEl.textContent = shortAddr(CONTRACT_ADDRESS);
 }
 
@@ -207,6 +245,7 @@ async function switchToExpectedNetwork(){
     });
     // MetaMask's chainChanged listener (wired below) reloads the page.
   }catch(err){
+    console.error(err);
     toast(
       `Couldn't switch automatically — please switch MetaMask to ${CONTRACT_NETWORK} manually.`,
       'err'
@@ -246,8 +285,6 @@ async function bindWallet(){
  *  eth_accounts — if this site was already authorised in MetaMask, the
  *  wallet reconnects automatically. Falls back to showing "Connect Wallet". */
 function paintContractChrome(){
-  const contractEl = document.getElementById('contractAddrShort');
-  if(contractEl) contractEl.textContent = shortAddr(CONTRACT_ADDRESS);
   const drawerEl = document.getElementById('drawerContractAddr');
   if(drawerEl) drawerEl.textContent = shortAddr(CONTRACT_ADDRESS);
 }
@@ -283,6 +320,7 @@ async function initWallet(){
       document.dispatchEvent(new CustomEvent('wallet:disconnected'));
     }
   }catch(err){
+    console.error(err);
     localStorage.removeItem(WALLET_FLAG_KEY);
     paintDisconnected();
     document.dispatchEvent(new CustomEvent('wallet:disconnected'));
@@ -304,7 +342,7 @@ async function connectWallet(){
     localStorage.setItem(WALLET_FLAG_KEY, '1');
     toast('Wallet connected.', 'ok');
   }catch(err){
-    toast('Connection failed: ' + (err.message || err), 'err');
+    toast('Connection failed: ' + friendlyError(err), 'err');
   }
 }
 
@@ -325,6 +363,7 @@ async function disconnectWallet(){
   }catch(err){
     // Not all wallets support this yet — that's fine, we still clear
     // local state below so this site stops auto-reconnecting.
+    console.error(err);
   }
 
   provider = undefined;
@@ -344,6 +383,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(disconnectBtn) disconnectBtn.addEventListener('click', disconnectWallet);
   initWallet();
   wireDrawer();
+  if(window.lucide) lucide.createIcons();
 });
 
 /* ---------------- Hamburger drawer menu ---------------- */
