@@ -294,19 +294,9 @@ describe("CarnivalStallManager", function () {
       ).to.be.revertedWithCustomError(contract, "CarnivalNotYetProcessed");
     });
 
-    it("blocks withdrawal on the same day processing occurred", async function () {
+    it("allows withdrawal immediately once the carnival has been processed", async function () {
       await time.increaseTo(carnivalEndTime + 1);
       await contract.connect(organiser).processCarnivalEnd();
-
-      await expect(
-        contract.connect(student).withdrawFunds(0)
-      ).to.be.revertedWithCustomError(contract, "WithdrawalWindowNotOpen");
-    });
-
-    it("allows withdrawal the day after processing", async function () {
-      await time.increaseTo(carnivalEndTime + 1);
-      await contract.connect(organiser).processCarnivalEnd();
-      await time.increase(24 * 60 * 60 + 1);
 
       const before = await ethers.provider.getBalance(student.address);
       const tx = await contract.connect(student).withdrawFunds(0);
@@ -324,7 +314,6 @@ describe("CarnivalStallManager", function () {
     it("prevents a non-owner from withdrawing", async function () {
       await time.increaseTo(carnivalEndTime + 1);
       await contract.connect(organiser).processCarnivalEnd();
-      await time.increase(24 * 60 * 60 + 1);
 
       await expect(
         contract.connect(stranger).withdrawFunds(0)
@@ -334,7 +323,6 @@ describe("CarnivalStallManager", function () {
     it("prevents double withdrawal", async function () {
       await time.increaseTo(carnivalEndTime + 1);
       await contract.connect(organiser).processCarnivalEnd();
-      await time.increase(24 * 60 * 60 + 1);
 
       await contract.connect(student).withdrawFunds(0);
       await expect(

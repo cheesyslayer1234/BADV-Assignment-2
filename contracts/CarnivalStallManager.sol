@@ -8,7 +8,6 @@ contract CarnivalStallManager {
     error ReentrancyDetected();
     error CarnivalNotYetProcessed();
     error NothingToWithdraw();
-    error AlreadyWithdrawn(uint256 stallId);
     error InsufficientStallBalance(uint256 available, uint256 requested);
     error InsufficientPayerCredit(uint256 available, uint256 requested);
     error ZeroAmount();
@@ -222,13 +221,9 @@ contract CarnivalStallManager {
         emit RefundIssued(stallId, payer, amount);
     }
 
-    /// @notice Marks the carnival as processed. Per the brief, withdrawal
-    /// opens once the organiser has processed the carnival day (which can
-    /// only happen after carnivalEndTime has passed — i.e. "the following
-    /// day"). No further artificial delay is layered on top of this: the
-    /// single carnivalEndTime + processed gate IS "the following day"
-    /// requirement, so withdrawFunds no longer adds an extra +1 days wait
-    /// on top (FIX 1 — see withdrawFunds below).
+    /// @notice Marks the carnival as processed. This can only happen after
+    /// carnivalEndTime has passed (i.e. "the following day"). Withdrawal
+    /// opens as soon as this has been done — see withdrawFunds below.
     function processCarnivalEnd() external onlyOrganiser {
         if (carnivalProcessed) revert AlreadyProcessed();
         if (block.timestamp <= carnivalEndTime) revert TooEarlyToProcess();
@@ -240,18 +235,13 @@ contract CarnivalStallManager {
     }
 
     /// @notice Withdraws a stall's full collected balance to its owner.
-    /// FIX 1: withdrawal now opens as soon as the organiser has processed
-    /// the carnival end (carnivalProcessed == true), instead of requiring
-    /// an additional fixed 1-day wait after processing on top of that. The
-    /// old logic effectively made owners wait ~2 days after carnivalEndTime
-    /// (1 day for the organiser to process + a further 1-day withdrawal
-    /// delay), which was stricter than "withdraw the day after it is
-    /// processed by the organisers." processCarnivalEnd() already cannot be
-    /// called until after carnivalEndTime, so that single check is enough.
-    /// FIX 2: `withdrawn` is now an active guard, not just a display flag —
-    /// it's checked explicitly (in addition to balance == 0) as a
-    /// deliberate defense-in-depth measure, so a stall can never be paid
-    /// out twice even under a hypothetical bug in the balance accounting.
+    /// Withdrawal opens as soon as the carnival has been processed by the
+    /// organiser (no additional delay on top of that — processCarnivalEnd
+    /// already can't be called until after carnivalEndTime). `amount == 0`
+    /// is checked before the (redundant, defense-in-depth) `withdrawn`
+    /// flag, so a second withdrawal attempt — where the balance is already
+    /// zero — correctly surfaces as NothingToWithdraw rather than a
+    /// separate AlreadyWithdrawn error.
     function withdrawFunds(uint256 stallId)
         external
         nonReentrant
@@ -260,7 +250,6 @@ contract CarnivalStallManager {
         if (!carnivalProcessed) revert CarnivalNotYetProcessed();
 
         Stall storage stall = stalls[stallId];
-        if (stall.withdrawn) revert AlreadyWithdrawn(stallId);
 
         uint256 amount = stall.balance;
         if (amount == 0) revert NothingToWithdraw();
@@ -308,8 +297,9 @@ contract CarnivalStallManager {
         return payerCredit[stallId][payer];
     }
 
-    /// @notice FIX 1: withdrawal window is now simply "has the organiser
-    /// processed the carnival end", with no extra fixed delay stacked on.
+    /// @notice The withdrawal window is open once the organiser has
+    /// processed the carnival end. No additional fixed delay is stacked on
+    /// top of that.
     function isWithdrawalWindowOpen() public view returns (bool) {
         return carnivalProcessed;
     }
