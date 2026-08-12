@@ -124,12 +124,6 @@ contract CarnivalStallManager {
         carnivalEndTime = _carnivalEndTime;
     }
 
-    
-    
-    
-    
-    
-    
     function registerStall(string calldata name)
         external
         returns (uint256 stallId)
