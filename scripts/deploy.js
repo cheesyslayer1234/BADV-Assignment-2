@@ -4,7 +4,7 @@ const hre = require("hardhat");
 
 async function main() {
   
-  const carnivalEndTime = Math.floor(Date.now() / 1000) + 6 * 60;
+  const carnivalEndTime = Math.floor(Date.now() / 1000) + 2 * 60;
 
   const CarnivalStallManager = await hre.ethers.getContractFactory(
     "CarnivalStallManager"
