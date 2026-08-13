@@ -342,9 +342,26 @@ describe("CarnivalStallManager", function () {
       ).to.be.revertedWithCustomError(contract, "CarnivalNotYetProcessed");
     });
 
-    it("allows withdrawal immediately once the carnival has been processed", async function () {
+    it("blocks withdrawal during the processing delay window, even after processing", async function () {
       await time.increaseTo(carnivalEndTime + 1);
       await contract.connect(organiser).processCarnivalEnd();
+
+      // No time advanced yet past processing - PROCESSING_DELAY hasn't elapsed.
+      await expect(
+        contract.connect(student).withdrawFunds(0)
+      ).to.be.revertedWithCustomError(contract, "CarnivalNotYetProcessed");
+
+      expect(await contract.isWithdrawalWindowOpen()).to.equal(false);
+    });
+
+    it("allows withdrawal once the processing delay has elapsed", async function () {
+      await time.increaseTo(carnivalEndTime + 1);
+      await contract.connect(organiser).processCarnivalEnd();
+
+      const delay = await contract.PROCESSING_DELAY();
+      await time.increase(delay);
+
+      expect(await contract.isWithdrawalWindowOpen()).to.equal(true);
 
       const before = await ethers.provider.getBalance(student.address);
       const tx = await contract.connect(student).withdrawFunds(0);
@@ -363,6 +380,9 @@ describe("CarnivalStallManager", function () {
       await time.increaseTo(carnivalEndTime + 1);
       await contract.connect(organiser).processCarnivalEnd();
 
+      const delay = await contract.PROCESSING_DELAY();
+      await time.increase(delay);
+
       await expect(
         contract.connect(stranger).withdrawFunds(0)
       ).to.be.revertedWithCustomError(contract, "NotStallOwner");
@@ -371,6 +391,9 @@ describe("CarnivalStallManager", function () {
     it("prevents double withdrawal", async function () {
       await time.increaseTo(carnivalEndTime + 1);
       await contract.connect(organiser).processCarnivalEnd();
+
+      const delay = await contract.PROCESSING_DELAY();
+      await time.increase(delay);
 
       await contract.connect(student).withdrawFunds(0);
       await expect(
