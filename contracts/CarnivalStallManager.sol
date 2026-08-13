@@ -317,4 +317,3 @@ contract CarnivalStallManager {
         return address(this).balance;
     }
 }
-//
