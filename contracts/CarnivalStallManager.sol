@@ -29,6 +29,9 @@ contract CarnivalStallManager {
 
     uint256 public carnivalProcessedAt;
 
+    // Time that must pass after processCarnivalEnd() before withdrawals unlock.
+    uint256 public constant PROCESSING_DELAY = 1 minutes;
+
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
     uint256 private _reentrancyStatus = _NOT_ENTERED;
@@ -54,12 +57,6 @@ contract CarnivalStallManager {
 
     mapping(uint256 => mapping(address => uint256)) private payerCredit;
 
-    
-    
-    
-    
-    
-    
     mapping(address => bool) public hasPendingApplication;
     mapping(address => uint256) public pendingStallIdOf;
 
@@ -77,11 +74,6 @@ contract CarnivalStallManager {
         _;
     }
 
-    
-    
-    
-    
-    
     function _requireRegistered(uint256 stallId) internal view {
         if (!stalls[stallId].registered) revert StallDoesNotExist(stallId);
     }
@@ -103,9 +95,6 @@ contract CarnivalStallManager {
         _;
     }
 
-    
-    
-    
     function _clearPendingFlag(address owner, uint256 stallId) internal {
         if (hasPendingApplication[owner] && pendingStallIdOf[owner] == stallId) {
             hasPendingApplication[owner] = false;
@@ -166,8 +155,6 @@ contract CarnivalStallManager {
         emit StallApproved(stallId, msg.sender, block.timestamp);
     }
 
-    
-    
     function rejectStall(uint256 stallId, string calldata reason)
         external
         onlyOrganiser
@@ -186,9 +173,6 @@ contract CarnivalStallManager {
         emit StallRejected(stallId, msg.sender, reason, block.timestamp);
     }
 
-    
-    
-    
     function resubmitStall(uint256 stallId, string calldata newName)
         external
         onlyStallOwner(stallId)
@@ -196,12 +180,7 @@ contract CarnivalStallManager {
         Stall storage stall = stalls[stallId];
         if (stall.status != StallStatus.Rejected) revert StallNotRejected(stallId);
         if (bytes(newName).length == 0) revert EmptyStallName();
-        
-        
-        
-        
-        
-        
+
         if (hasPendingApplication[msg.sender] && pendingStallIdOf[msg.sender] != stallId) {
             revert ApplicantHasPendingApplication(msg.sender, pendingStallIdOf[msg.sender]);
         }
@@ -256,9 +235,6 @@ contract CarnivalStallManager {
         emit RefundIssued(stallId, payer, amount);
     }
 
-    
-    
-    
     function processCarnivalEnd() external onlyOrganiser {
         if (carnivalProcessed) revert AlreadyProcessed();
         if (block.timestamp <= carnivalEndTime) revert TooEarlyToProcess();
@@ -269,20 +245,13 @@ contract CarnivalStallManager {
         emit CarnivalProcessed(block.timestamp);
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     function withdrawFunds(uint256 stallId)
         external
         nonReentrant
         onlyStallOwner(stallId)
     {
         if (!carnivalProcessed) revert CarnivalNotYetProcessed();
+        if (block.timestamp < carnivalProcessedAt + PROCESSING_DELAY) revert CarnivalNotYetProcessed();
 
         Stall storage stall = stalls[stallId];
 
@@ -332,10 +301,6 @@ contract CarnivalStallManager {
         return payerCredit[stallId][payer];
     }
 
-    
-    
-    
-    
     function getPendingApplication(address applicant)
         external
         view
@@ -344,15 +309,11 @@ contract CarnivalStallManager {
         return (hasPendingApplication[applicant], pendingStallIdOf[applicant]);
     }
 
-    
-    
-    
     function isWithdrawalWindowOpen() public view returns (bool) {
-        return carnivalProcessed;
+        return carnivalProcessed && block.timestamp >= carnivalProcessedAt + PROCESSING_DELAY;
     }
 
     function contractBalance() external view returns (uint256) {
         return address(this).balance;
     }
 }
-//
