@@ -30,7 +30,7 @@ contract CarnivalStallManager {
     uint256 public carnivalProcessedAt;
 
     // Time that must pass after processCarnivalEnd() before withdrawals unlock.
-    uint256 public constant PROCESSING_DELAY = 10 seconds;
+    uint256 public constant PROCESSING_DELAY = 60 seconds;
 
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
